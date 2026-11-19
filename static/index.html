@@ -1,269 +1,470 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Veritas — Evidence-Grounded Research Agent</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <style>
-    body { background-color: #090d16; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
-    .citation-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      background: rgba(56, 189, 248, 0.15); color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      font-size: 0.75rem; font-weight: 700; padding: 0 5px;
-      border-radius: 4px; margin: 0 2px; cursor: pointer; text-decoration: none;
-    }
-    .citation-badge:hover { background: #38bdf8; color: #090d16; }
-    .prose p { margin-bottom: 0.75rem; line-height: 1.65; }
-    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
-    .prose strong { color: #f8fafc; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Veritas — Evidence-Grounded Research Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','ui-monospace','monospace'] } } } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background: #070b14; color: #e8edf5; font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv11','ss03'; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+    background: radial-gradient(60% 40% at 50% -5%, rgba(56,189,248,.10), transparent 70%), radial-gradient(40% 30% at 90% 10%, rgba(99,102,241,.08), transparent 70%); }
+  .glass { background: rgba(15,23,42,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(30,41,59,.8); }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+  .fade-in { animation: fadeUp .5s ease both; }
+  .hero { transition: max-height .6s ease, opacity .4s ease, margin .6s ease; max-height: 700px; overflow: hidden; position: relative; isolation: isolate; }
+  body.results .hero { max-height: 0; opacity: 0; margin: 0; pointer-events: none; }
+  #compactForm { transition: opacity .5s ease .15s; opacity: 0; pointer-events: none; }
+  body.results #compactForm { opacity: 1; pointer-events: auto; }
+  body.results #brandText { display: none; }
+  @media (min-width: 640px) { body.results #brandText { display: block; } }
+  .citation-badge { display:inline-flex; align-items:center; justify-content:center; min-width:1.35rem; height:1.35rem; padding:0 5px; margin:0 2px; vertical-align:baseline;
+    font: 600 .7rem 'JetBrains Mono', monospace; color:#38bdf8; background:rgba(56,189,248,.12); border:1px solid rgba(56,189,248,.35); border-radius:6px; cursor:pointer; text-decoration:none; transition:.15s; }
+  .citation-badge:hover { background:#38bdf8; color:#070b14; }
+  .flash { animation: flash 1.8s ease; }
+  @keyframes flash { 0%,30% { box-shadow: 0 0 0 2px rgba(56,189,248,.9), 0 0 28px rgba(56,189,248,.35); border-color: rgba(56,189,248,.9); } 100% { box-shadow: none; } }
+  .prose-a { font-size: 1.0625rem; color: #e8edf5; letter-spacing: -.005em; }
+  .prose-a p { margin-bottom: 1rem; line-height: 1.8; }
+  .prose-a ul { list-style: disc; padding-left: 1.4rem; margin-bottom: .85rem; }
+  .prose-a ol { list-style: decimal; padding-left: 1.4rem; margin-bottom: .85rem; }
+  .prose-a li { margin-bottom: .3rem; line-height: 1.7; }
+  .prose-a strong { color: #f8fafc; font-weight: 600; }
+  .prose-a h1,.prose-a h2,.prose-a h3 { color:#f1f5f9; font-weight:600; margin: 1rem 0 .5rem; }
+  .prose-a code { font-family:'JetBrains Mono',monospace; font-size:.85em; background:rgba(30,41,59,.8); padding:1px 5px; border-radius:4px; }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(180deg); }
+  .stage-dot { transition: all .4s ease; }
+  .hero-glow { position:absolute; left:50%; top:9.5rem; width:min(54rem,100%); height:22rem; transform:translateX(-50%); z-index:-1; pointer-events:none; filter:blur(48px);
+    background: radial-gradient(42% 55% at 33% 50%, rgba(99,102,241,.32), transparent 70%), radial-gradient(42% 55% at 67% 50%, rgba(34,211,238,.24), transparent 70%);
+    animation: glowDrift 14s ease-in-out infinite alternate; }
+  @keyframes glowDrift { from { opacity:.75; transform:translateX(-52%) scale(.97); } to { opacity:1; transform:translateX(-48%) scale(1.04); } }
+  .meter-seg { transform-origin:left; animation: meterIn .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes meterIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  #drawer { transition: transform .35s ease; }
+  :focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col antialiased">
 
-  <!-- Header -->
-  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-10">
-    <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center font-bold text-slate-950">V</div>
-        <div>
-          <h1 class="font-bold text-slate-100 leading-tight">Veritas Research Agent</h1>
-          <p class="text-xs text-slate-400">Nebius Token Factory × Tavily Search</p>
-        </div>
+<!-- Header with compact search -->
+<header class="sticky top-0 z-30 border-b border-slate-800/80 bg-[#070b14]/80 backdrop-blur-xl">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
+    <button type="button" id="homeBtn" class="flex items-center gap-2.5 shrink-0 cursor-pointer" aria-label="New search">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center font-bold text-slate-950">V</div>
+      <div id="brandText" class="text-left">
+        <div class="font-semibold text-slate-100 leading-tight text-sm">Veritas</div>
+        <div class="text-[11px] text-slate-500 leading-tight">Nebius × Tavily</div>
       </div>
-      <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border"></div>
-    </div>
-  </header>
-
-  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
-    <!-- Input Box -->
-    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-      <form id="researchForm" class="flex flex-col sm:flex-row gap-3">
-        <input
-          id="questionInput"
-          type="text"
-          minlength="5"
-          placeholder="Ask a research question requiring verifiable sources and claim-level evidence..."
-          class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
-          required
-        />
-        <button
-          id="submitBtn"
-          type="submit"
-          class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-6 py-3 rounded-xl transition shrink-0 cursor-pointer"
-        >
-          Research
-        </button>
-      </form>
-
-      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-        <span>Presets:</span>
-        <button type="button" onclick="setQuery('What are the main drivers of urban heat islands?')" class="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300">
-          Urban Heat Islands
-        </button>
-        <button type="button" onclick="setQuery('What was the exact score of the 2029 Mars Colonial Cup final?')" class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30">
-          Test Insufficient Evidence
-        </button>
+    </button>
+    <form id="compactForm" class="flex-1 flex items-center gap-2 min-w-0">
+      <div class="relative flex-1 min-w-0">
+        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input id="compactInput" type="text" minlength="5" required placeholder="Ask a follow-up or new question…"
+          class="w-full bg-slate-900/70 border border-slate-800/80 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500/70 transition" />
       </div>
+      <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold px-4 py-2 rounded-xl transition cursor-pointer shrink-0">Research</button>
+    </form>
+    <div id="healthBadge" class="flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border border-slate-800 bg-slate-900/60 text-slate-400 shrink-0 ml-auto" title="Backend status">
+      <span id="healthDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+      <span id="healthText" class="hidden sm:inline font-mono text-[11px]">checking…</span>
     </div>
+    <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border shrink-0"></div>
+  </div>
+</header>
 
-    <!-- Error Banner -->
-    <div id="errorBox" class="hidden mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-sm"></div>
+<main class="flex-1 max-w-6xl w-full mx-auto px-4">
 
-    <!-- Loading Indicator -->
-    <div id="loadingBox" class="hidden mt-8 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-      <div class="flex items-center gap-3 text-sky-400 font-medium">
-        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-        </svg>
-        <span id="loadingText">Planning search queries & gathering verifiable evidence...</span>
-      </div>
+  <!-- Hero -->
+  <section class="hero text-center pt-16 sm:pt-28 pb-6">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="inline-flex items-center gap-2 text-xs text-slate-400 border border-slate-800/80 rounded-full px-3 py-1 glass mb-6">
+      <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Every claim checked against its sources
     </div>
+    <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-slate-50">What do you want to verify?</h1>
+    <p class="mt-3 text-slate-400 max-w-xl mx-auto">Ask a question and get a cited answer, with each claim marked supported, contradicted or unverified.</p>
+    <form id="heroForm" class="mt-8 max-w-2xl mx-auto glass rounded-2xl p-2 flex items-center gap-2 shadow-2xl shadow-sky-950/30 focus-within:border-sky-500/60 transition">
+      <i data-lucide="search" class="w-5 h-5 text-slate-500 ml-3 shrink-0"></i>
+      <input id="heroInput" type="text" minlength="5" required placeholder="Ask a research question that needs verifiable sources…"
+        class="flex-1 min-w-0 bg-transparent px-1 py-3 text-slate-100 placeholder-slate-500 focus:outline-none" />
+      <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0 flex items-center gap-2">
+        Research <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </button>
+    </form>
+    <div class="mt-5 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-2 text-left" id="presets"></div>
+  </section>
 
-    <!-- Report Layout -->
-    <div id="resultsContainer" class="hidden mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- Left 2 Cols: Answer + Limitations + Claim Cards -->
-      <div class="lg:col-span-2 space-y-6">
-        
-        <!-- Synthesized Answer -->
-        <div id="answerCard" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-lg">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-sky-400">Synthesized Answer</h2>
-            <span id="roundsBadge" class="text-xs text-slate-500"></span>
+  <!-- Error -->
+  <div id="errorBox" class="hidden mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-sm flex gap-3 items-start fade-in">
+    <i data-lucide="octagon-alert" class="w-4 h-4 mt-0.5 shrink-0"></i><div id="errorText"></div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingBox" class="hidden mt-8 max-w-2xl mx-auto glass rounded-2xl p-6 fade-in">
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center gap-2.5 text-slate-200 font-medium"><i data-lucide="loader-circle" class="w-4 h-4 animate-spin text-sky-400"></i> Researching</div>
+      <div class="font-mono text-sm text-sky-400"><span id="timer">0.0</span>s</div>
+    </div>
+    <ol id="stages" class="space-y-3"></ol>
+    <p class="mt-5 text-[11px] text-slate-500">Stages advance on an estimated schedule while the server works; the request usually finishes within 10–40 seconds.</p>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsContainer" class="hidden py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6 min-w-0">
+      <div id="answerCard" class="glass rounded-2xl p-6 sm:p-8 fade-in">
+        <p id="questionEcho" class="text-xl sm:text-2xl font-semibold tracking-tight text-slate-50 mb-5"></p>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div class="flex items-center gap-2 text-sm font-medium text-sky-400"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-500 font-normal"></span></div>
+          <div class="flex items-center gap-2">
+            <button id="copyMdBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Markdown report</span></button>
+            <button id="jsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="braces" class="w-3.5 h-3.5"></i>View raw JSON</button>
           </div>
-          <div id="answerContent" class="prose text-slate-200 text-base"></div>
         </div>
-
-        <!-- Limitations Box -->
-        <div id="limitationsBox" class="hidden bg-amber-950/20 border border-amber-500/40 rounded-xl p-4">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2">Evidence Limitations & Uncertainty</h3>
-          <ul id="limitationsList" class="list-disc pl-5 text-xs text-amber-200/90 space-y-1"></ul>
-        </div>
-
-        <!-- Claim Verification Cards -->
-        <div id="claimsSection" class="space-y-3">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Claim-Level Verification (<span id="claimCount">0</span>)</h2>
-          <div id="claimsList" class="space-y-3"></div>
-        </div>
+        <div id="answerContent" class="prose-a text-slate-200"></div>
+        <div id="metaRow" class="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-500 font-mono"></div>
       </div>
 
-      <!-- Right Col: Source Cards -->
-      <div class="space-y-4">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Verified Sources (<span id="sourceCount">0</span>)</h2>
-        <div id="sourcesList" class="space-y-3"></div>
+      <div id="limitationsBox" class="hidden rounded-2xl p-4 bg-amber-950/20 border border-amber-500/30 fade-in">
+        <h3 class="flex items-center gap-2 text-sm font-medium text-amber-300 mb-2"><i data-lucide="triangle-alert" class="w-4 h-4"></i> Limits of the evidence</h3>
+        <ul id="limitationsList" class="list-disc pl-5 text-sm text-amber-200/90 space-y-1"></ul>
       </div>
 
+      <section class="space-y-3">
+        <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-slate-400"></i> Claim verification <span class="text-slate-500 font-normal">(<span id="claimCount">0</span>)</span></h2>
+        <div id="claimsList" class="space-y-3"></div>
+      </section>
     </div>
-  </main>
 
-  <script>
-    function setQuery(q) { document.getElementById('questionInput').value = q; }
+    <aside class="min-w-0">
+      <div class="lg:sticky lg:top-20 space-y-3">
+        <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="library" class="w-4 h-4 text-slate-400"></i> Sources <span class="text-slate-500 font-normal">(<span id="sourceCount">0</span>)</span></h2>
+        <div id="sourcesList" class="space-y-3 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1"></div>
+      </div>
+    </aside>
+  </div>
+</main>
 
-    document.getElementById('researchForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const question = document.getElementById('questionInput').value.trim();
-      if (!question) return;
+<footer class="text-center text-[11px] text-slate-600 py-6">Veritas checks claims against retrieved sources. It can still be wrong, so open the sources.</footer>
 
-      const btn = document.getElementById('submitBtn');
-      const loadingBox = document.getElementById('loadingBox');
-      const resultsContainer = document.getElementById('resultsContainer');
-      const errorBox = document.getElementById('errorBox');
+<!-- Raw JSON drawer -->
+<div id="drawerBackdrop" class="hidden fixed inset-0 z-40 bg-black/50"></div>
+<aside id="drawer" class="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[34rem] translate-x-full bg-[#0a1020] border-l border-slate-800/80 flex flex-col" aria-hidden="true">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
+    <div>
+      <div class="text-sm font-medium text-slate-100">Raw response</div>
+      <div class="text-[11px] text-slate-500 font-mono">ResearchResult · POST /api/research</div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="copyJsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 hover:border-sky-500/60 text-slate-300 cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy</span></button>
+      <button id="closeDrawer" type="button" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+  <pre id="jsonPre" class="flex-1 overflow-auto p-4 text-[12px] leading-relaxed font-mono text-slate-300"></pre>
+</aside>
 
-      btn.disabled = true;
-      btn.classList.add('opacity-50');
-      errorBox.classList.add('hidden');
-      resultsContainer.classList.add('hidden');
-      loadingBox.classList.remove('hidden');
+<script>
+  /* ---------- helpers ---------- */
+  const $ = id => document.getElementById(id);
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function safeUrl(u) { return /^https?:\/\//i.test(u || '') ? u : '#'; }
+  const icons = () => window.lucide && lucide.createIcons();
 
-      try {
-        const res = await fetch('/api/research', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'API Error');
-        renderReport(data);
-      } catch (err) {
-        errorBox.textContent = "Error: " + err.message;
-        errorBox.classList.remove('hidden');
-      } finally {
-        loadingBox.classList.add('hidden');
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-      }
+  const PRESETS = [
+    { q: 'What are the main drivers of urban heat islands?', label: 'Urban heat islands', hint: 'Well-sourced science', icon: 'thermometer-sun', tone: 'slate' },
+    { q: 'Is moderate coffee consumption beneficial or harmful for long-term health?', label: 'Coffee and long-term health', hint: 'Disputed: studies disagree', icon: 'scale', tone: 'rose' },
+    { q: 'How do solid-state batteries compare with lithium-ion for electric vehicles?', label: 'Solid-state vs lithium-ion', hint: 'Fast-moving, mixed claims', icon: 'battery-charging', tone: 'slate' },
+    { q: 'What was the exact score of the 2029 Mars Colonial Cup final?', label: '2029 Mars Colonial Cup', hint: 'Insufficient-evidence test', icon: 'flask-conical', tone: 'amber' }
+  ];
+  const toneCls = {
+    slate: 'border-slate-800/80 hover:border-sky-500/50 text-slate-300',
+    rose: 'border-rose-500/25 hover:border-rose-400/60 text-rose-200',
+    amber: 'border-amber-500/25 hover:border-amber-400/60 text-amber-200'
+  };
+  $('presets').innerHTML = PRESETS.map((p, i) => `
+    <button type="button" data-preset="${i}" class="glass ${toneCls[p.tone]} rounded-xl px-4 py-3 flex items-center gap-3 transition cursor-pointer text-left">
+      <i data-lucide="${p.icon}" class="w-4 h-4 shrink-0 opacity-80"></i>
+      <span class="min-w-0"><span class="block text-sm font-medium truncate">${p.label}</span><span class="block text-[11px] text-slate-500">${p.hint}</span></span>
+    </button>`).join('');
+  $('presets').addEventListener('click', e => {
+    const b = e.target.closest('[data-preset]'); if (!b) return;
+    runResearch(PRESETS[+b.dataset.preset].q);
+  });
+
+  /* ---------- state ---------- */
+  let lastData = null, lastSources = [], timerId = null, stageTimeouts = [];
+  const STAGES = [
+    { t: 0,     label: 'Planning search queries…' },
+    { t: 3500,  label: 'Querying Tavily web index…' },
+    { t: 9000,  label: 'Extracting & cross-checking evidence…' },
+    { t: 16000, label: 'Synthesizing cited report…' }
+  ];
+
+  function setMode(results) { document.body.classList.toggle('results', results); }
+
+  /* ---------- loading stages ---------- */
+  function startLoading() {
+    $('stages').innerHTML = STAGES.map((s, i) => `
+      <li id="stage-${i}" class="flex items-center gap-3 text-sm text-slate-600 transition">
+        <span class="stage-dot w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+        <span>${i + 1}. ${s.label}</span>
+      </li>`).join('');
+    const setStage = n => STAGES.forEach((_, i) => {
+      const li = $('stage-' + i), dot = li.firstElementChild;
+      if (i < n) { li.className = 'flex items-center gap-3 text-sm text-slate-400 transition'; dot.className = 'stage-dot w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center shrink-0'; dot.innerHTML = '<i data-lucide="check" class="w-3 h-3 text-emerald-400"></i>'; }
+      else if (i === n) { li.className = 'flex items-center gap-3 text-sm text-sky-300 font-medium transition'; dot.className = 'stage-dot w-5 h-5 rounded-full border border-sky-400 flex items-center justify-center shrink-0'; dot.innerHTML = '<span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>'; }
     });
+    stageTimeouts = STAGES.map((s, i) => setTimeout(() => { setStage(i); icons(); }, s.t));
+    const t0 = performance.now();
+    timerId = setInterval(() => { $('timer').textContent = ((performance.now() - t0) / 1000).toFixed(1); }, 100);
+    $('loadingBox').classList.remove('hidden');
+  }
+  function stopLoading() {
+    clearInterval(timerId); stageTimeouts.forEach(clearTimeout);
+    $('loadingBox').classList.add('hidden');
+  }
 
-    function renderReport(data) {
-      const resultsContainer = document.getElementById('resultsContainer');
-      const statusPill = document.getElementById('statusPill');
-      const roundsBadge = document.getElementById('roundsBadge');
-      const answerContent = document.getElementById('answerContent');
-      const limitationsBox = document.getElementById('limitationsBox');
-      const limitationsList = document.getElementById('limitationsList');
-      const claimsList = document.getElementById('claimsList');
-      const claimCount = document.getElementById('claimCount');
-      const sourcesList = document.getElementById('sourcesList');
-      const sourceCount = document.getElementById('sourceCount');
+  /* ---------- research flow ---------- */
+  async function runResearch(question) {
+    question = (question || '').trim();
+    if (question.length < 5) return;
+    $('heroInput').value = question; $('compactInput').value = question;
 
-      // Status Pill
-      const statusStyles = {
-        success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-        partial: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-        insufficient_evidence: 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-      };
-      statusPill.className = `text-xs px-3 py-1 rounded-full font-medium border ${statusStyles[data.status] || statusStyles.partial}`;
-      statusPill.textContent = `Status: ${data.status.replace('_', ' ')}`;
-      statusPill.classList.remove('hidden');
+    document.querySelectorAll('.compactBtn').forEach(b => { b.disabled = true; b.classList.add('opacity-50'); });
+    $('errorBox').classList.add('hidden');
+    $('resultsContainer').classList.add('hidden');
+    setMode(true);
+    startLoading(); icons();
 
-      roundsBadge.textContent = `Search rounds: ${data.search_rounds || 1}`;
-
-      // Map source_id -> index for [1], [2] citations
-      const sources = data.sources || [];
-      const sourceIndexMap = {};
-      sources.forEach((s, idx) => { sourceIndexMap[s.id] = idx + 1; });
-
-      // Answer with clickable [n] citations
-      let html = marked.parse(data.answer || '');
-      html = html.replace(/\[(\d+)\]/g, (match, num) => {
-        const src = sources[parseInt(num, 10) - 1];
-        return src
-          ? `<a href="${src.url}" target="_blank" rel="noopener noreferrer" class="citation-badge" title="${escapeHtml(src.title)}">[${num}]</a>`
-          : match;
+    try {
+      const res = await fetch('/api/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
       });
-      answerContent.innerHTML = html;
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : (data.detail ? JSON.stringify(data.detail) : 'API Error'));
+      renderReport(data);
+    } catch (err) {
+      $('errorText').textContent = 'Research failed: ' + err.message;
+      $('errorBox').classList.remove('hidden');
+    } finally {
+      stopLoading();
+      document.querySelectorAll('.compactBtn').forEach(b => { b.disabled = false; b.classList.remove('opacity-50'); });
+      icons();
+    }
+  }
 
-      // Limitations
-      const lims = data.limitations || [];
-      if (lims.length > 0) {
-        limitationsList.innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
-        limitationsBox.classList.remove('hidden');
-      } else {
-        limitationsBox.classList.add('hidden');
-      }
+  ['heroForm', 'compactForm'].forEach(id => $(id).addEventListener('submit', e => {
+    e.preventDefault();
+    runResearch(e.target.querySelector('input').value);
+  }));
+  $('homeBtn').addEventListener('click', () => {
+    setMode(false); $('resultsContainer').classList.add('hidden'); $('errorBox').classList.add('hidden');
+    $('statusPill').classList.add('hidden'); $('heroInput').value = ''; window.scrollTo({ top: 0 });
+  });
 
-      // Claim Cards
-      const claims = data.claims || [];
-      claimCount.textContent = claims.length;
-      const verColors = {
-        supported: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-        partially_supported: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-        contradicted: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-        unverified: 'bg-slate-700/40 text-slate-400 border-slate-600'
-      };
+  /* ---------- render ---------- */
+  const statusStyles = {
+    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    partial: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+    insufficient_evidence: 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+  };
+  const verStyles = {
+    supported: ['bg-emerald-500/10 text-emerald-400 border-emerald-500/30', 'circle-check'],
+    partially_supported: ['bg-amber-500/10 text-amber-300 border-amber-500/30', 'circle-dot'],
+    contradicted: ['bg-rose-500/10 text-rose-400 border-rose-500/30', 'circle-x'],
+    unverified: ['bg-slate-700/30 text-slate-400 border-slate-600/60', 'circle-help']
+  };
+  const typeStyles = {
+    supports: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    contradicts: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    contextual: 'bg-slate-700/30 text-slate-400 border-slate-600/60'
+  };
+  const pretty = s => String(s || '').replace(/_/g, ' ');
 
-      claimsList.innerHTML = claims.length === 0
-        ? `<div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">No verified claims extracted.</div>`
-        : claims.map(c => {
-            const evHtml = (c.evidence || []).map(ev => {
-              const num = sourceIndexMap[ev.source_id] || '?';
-              return `
-                <div class="mt-2 pl-3 border-l-2 border-sky-500/50 text-xs text-slate-300 bg-slate-950/60 p-2 rounded-r">
-                  <span class="text-sky-400 font-semibold">[${num}] (${ev.support_type}):</span>
-                  "${escapeHtml(ev.excerpt)}"
-                </div>`;
-            }).join('');
+  function confLevel(c) {
+    if (typeof c === 'number') { const p = c <= 1 ? c * 100 : c; return p >= 75 ? 3 : p >= 45 ? 2 : 1; }
+    const l = String(c || '').toLowerCase();
+    return l === 'high' ? 3 : l === 'medium' ? 2 : l === 'low' ? 1 : 0;
+  }
+  function confBadge(c) {
+    const lvl = confLevel(c);
+    const col = lvl === 3 ? ['bg-emerald-400', 'text-emerald-300'] : lvl === 2 ? ['bg-amber-400', 'text-amber-300'] : lvl === 1 ? ['bg-rose-400', 'text-rose-300'] : ['bg-slate-600', 'text-slate-400'];
+    const label = typeof c === 'number' ? (c <= 1 ? Math.round(c * 100) : Math.round(c)) + '%' : (c ?? 'n/a');
+    const segs = [1, 2, 3].map(i => `<span class="meter-seg h-1.5 w-7 rounded-full ${i <= lvl ? col[0] : 'bg-slate-800'}" style="animation-delay:${i * 90}ms"></span>`).join('');
+    return `<div class="flex items-center gap-2.5" title="Confidence: ${escapeHtml(label)}" role="img" aria-label="Confidence: ${escapeHtml(label)}">
+      <div class="flex gap-1">${segs}</div>
+      <span class="text-xs font-medium capitalize ${col[1]}">${escapeHtml(label)} confidence</span></div>`;
+  }
 
-            return `
-              <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <span class="text-[11px] px-2 py-0.5 rounded border font-semibold uppercase ${verColors[c.verification_status] || verColors.unverified}">
-                    ${c.verification_status.replace('_', ' ')}
-                  </span>
-                  <span class="text-xs text-slate-400">Confidence: <strong class="text-slate-200">${c.confidence}</strong></span>
-                </div>
-                <p class="text-sm text-slate-100 font-medium">${escapeHtml(c.text)}</p>
-                ${evHtml}
-              </div>`;
-          }).join('');
+  function renderReport(data) {
+    lastData = data;
+    const sources = data.sources || [];
+    lastSources = sources;
+    const idx = {}; sources.forEach((s, i) => { idx[s.id] = i + 1; });
 
-      // Source Cards
-      sourceCount.textContent = sources.length;
-      sourcesList.innerHTML = sources.length === 0
-        ? `<div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">No external sources cited.</div>`
-        : sources.map((s, i) => `
-            <a href="${s.url}" target="_blank" rel="noopener noreferrer"
-               class="block p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/60 transition group">
-              <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">[${i + 1}] ${escapeHtml(s.domain)}</span>
-                <span class="text-[11px] text-slate-500 font-mono">${escapeHtml(s.id)}</span>
+    // status pill + meta
+    const st = data.status || 'partial';
+    $('statusPill').className = `text-xs px-3 py-1 rounded-full font-medium border shrink-0 ${statusStyles[st] || statusStyles.partial}`;
+    $('statusPill').textContent = pretty(st);
+    $('questionEcho').textContent = data.question || $('compactInput').value;
+    $('roundsBadge').textContent = `${data.search_rounds || 1} search round${(data.search_rounds || 1) > 1 ? 's' : ''}`;
+    $('metaRow').innerHTML = [
+      data.research_id && `<span>id: ${escapeHtml(data.research_id)}</span>`,
+      data.generated_at && `<span>${escapeHtml(new Date(data.generated_at).toLocaleString())}</span>`
+    ].filter(Boolean).join('');
+
+    // answer with interactive citations
+    let html = marked.parse(data.answer || '');
+    html = html.replace(/\[(\d+)\]/g, (m, n) => {
+      const src = sources[+n - 1];
+      return src ? `<a href="#src-${n}" data-cite="${n}" class="citation-badge" title="${escapeHtml(src.title)}">${n}</a>` : m;
+    });
+    $('answerContent').innerHTML = html;
+
+    // limitations
+    const lims = data.limitations || [];
+    $('limitationsList').innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+    $('limitationsBox').classList.toggle('hidden', !lims.length);
+
+    // claims
+    const claims = data.claims || [];
+    $('claimCount').textContent = claims.length;
+    $('claimsList').innerHTML = claims.length === 0
+      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims were extracted for this answer.</div>`
+      : claims.map(c => {
+          const [vcls, vicon] = verStyles[c.verification_status] || verStyles.unverified;
+          const ev = c.evidence || [];
+          const evHtml = ev.map(e => {
+            const n = idx[e.source_id];
+            const src = n ? sources[n - 1] : null;
+            return `<div class="pl-3 border-l-2 ${e.support_type === 'contradicts' ? 'border-rose-500/60' : e.support_type === 'supports' ? 'border-emerald-500/50' : 'border-slate-600'} bg-slate-950/50 rounded-r-lg p-3">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                <span class="text-[10px] px-1.5 py-0.5 rounded border ${typeStyles[e.support_type] || typeStyles.contextual}">${escapeHtml(e.support_type || 'contextual')}</span>
+                ${n ? `<a href="#src-${n}" data-cite="${n}" class="citation-badge" title="${escapeHtml(src.title)}">${n}</a><span class="text-[11px] text-slate-500 font-mono truncate">${escapeHtml(src.domain)}</span>` : `<span class="text-[11px] text-slate-500 font-mono">${escapeHtml(e.source_id)}</span>`}
               </div>
-              <h3 class="text-sm font-medium text-slate-200 group-hover:text-sky-400 transition line-clamp-2">
-                ${escapeHtml(s.title)} ↗
-              </h3>
-            </a>
-          `).join('');
+              <p class="text-[13.5px] text-slate-200 leading-relaxed">“${escapeHtml(e.excerpt)}”</p>
+            </div>`;
+          }).join('');
+          return `<div class="glass rounded-xl p-5 fade-in">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3.5">
+              <span class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${vcls}"><i data-lucide="${vicon}" class="w-3.5 h-3.5"></i>${escapeHtml(pretty(c.verification_status))}</span>
+              ${confBadge(c.confidence)}
+            </div>
+            <p class="text-[15px] text-slate-50 font-medium leading-relaxed">${escapeHtml(c.text)}</p>
+            ${ev.length ? `<details class="mt-3 group" ${ev.length <= 1 ? 'open' : ''}>
+              <summary class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-sky-300 transition select-none">
+                <i data-lucide="chevron-down" class="chev w-3.5 h-3.5 transition-transform"></i> ${ev.length} evidence quote${ev.length > 1 ? 's' : ''}
+              </summary>
+              <div class="mt-2 space-y-2">${evHtml}</div>
+            </details>` : `<p class="mt-3 text-xs text-slate-500">No evidence quotes attached.</p>`}
+          </div>`;
+        }).join('');
 
-      resultsContainer.classList.remove('hidden');
-    }
+    // sources
+    $('sourceCount').textContent = sources.length;
+    $('sourcesList').innerHTML = sources.length === 0
+      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No external sources were cited.</div>`
+      : sources.map((s, i) => `
+        <a id="src-${i + 1}" href="${escapeHtml(safeUrl(s.url))}" target="_blank" rel="noopener noreferrer"
+           class="block p-4 rounded-xl glass hover:border-sky-500/50 transition group fade-in">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="inline-flex items-center gap-2 min-w-0">
+              <span class="citation-badge" style="margin:0">${i + 1}</span>
+              <span class="text-xs text-slate-400 font-mono truncate">${escapeHtml(s.domain)}</span>
+            </span>
+            <span class="text-[10px] text-slate-600 font-mono shrink-0">${escapeHtml(s.id)}</span>
+          </div>
+          <h3 class="text-sm font-medium text-slate-200 group-hover:text-sky-300 transition line-clamp-2 flex items-start gap-1.5">
+            <span>${escapeHtml(s.title)}</span><i data-lucide="arrow-up-right" class="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-60"></i>
+          </h3>
+        </a>`).join('');
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    $('resultsContainer').classList.remove('hidden');
+    $('jsonPre').textContent = JSON.stringify(data, null, 2);
+    icons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------- citation click → scroll + highlight source card ---------- */
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-cite]'); if (!a) return;
+    e.preventDefault();
+    const card = $('src-' + a.dataset.cite); if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+  });
+
+  /* ---------- copy markdown / JSON ---------- */
+  function buildMarkdown(d) {
+    const src = d.sources || [];
+    const idx = {}; src.forEach((s, i) => { idx[s.id] = i + 1; });
+    let md = `# ${d.question}\n\n**Status:** ${pretty(d.status)} · **Search rounds:** ${d.search_rounds ?? 1}\n\n## Answer\n\n${d.answer || ''}\n`;
+    if ((d.limitations || []).length) md += `\n## Limitations\n\n${d.limitations.map(l => `- ${l}`).join('\n')}\n`;
+    if ((d.claims || []).length) {
+      md += `\n## Claim verification\n\n`;
+      d.claims.forEach((c, i) => {
+        md += `${i + 1}. **${c.text}** — _${pretty(c.verification_status)}_ (confidence: ${c.confidence})\n`;
+        (c.evidence || []).forEach(e => { md += `   - [${idx[e.source_id] || '?'}] ${e.support_type}: "${e.excerpt}"\n`; });
+      });
     }
-  </script>
+    md += `\n## Sources\n\n${src.map((s, i) => `${i + 1}. [${s.title}](${s.url}) — ${s.domain}`).join('\n')}\n`;
+    if (d.generated_at) md += `\n_Generated ${d.generated_at}${d.research_id ? ` · ${d.research_id}` : ''}_\n`;
+    return md;
+  }
+  async function copyText(text, btn) {
+    const label = btn.querySelector('span'); const old = label.textContent;
+    try { await navigator.clipboard.writeText(text); label.textContent = 'Copied'; }
+    catch { label.textContent = 'Copy failed'; }
+    setTimeout(() => { label.textContent = old; }, 1600);
+  }
+  $('copyMdBtn').addEventListener('click', e => lastData && copyText(buildMarkdown(lastData), e.currentTarget));
+  $('copyJsonBtn').addEventListener('click', e => lastData && copyText(JSON.stringify(lastData, null, 2), e.currentTarget));
+
+  /* ---------- JSON drawer ---------- */
+  function toggleDrawer(open) {
+    $('drawer').classList.toggle('translate-x-full', !open);
+    $('drawer').setAttribute('aria-hidden', String(!open));
+    $('drawerBackdrop').classList.toggle('hidden', !open);
+  }
+  $('jsonBtn').addEventListener('click', () => toggleDrawer(true));
+  $('closeDrawer').addEventListener('click', () => toggleDrawer(false));
+  $('drawerBackdrop').addEventListener('click', () => toggleDrawer(false));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleDrawer(false); });
+
+  /* ---------- backend health badge ---------- */
+  async function checkHealth() {
+    const badge = $('healthBadge'), dot = $('healthDot'), text = $('healthText');
+    const set = (tone, label, title) => {
+      const t = { ok: ['bg-emerald-400', 'text-emerald-300', 'border-emerald-500/30'], mock: ['bg-amber-400', 'text-amber-300', 'border-amber-500/30'], off: ['bg-rose-500', 'text-rose-300', 'border-rose-500/30'] }[tone];
+      dot.className = `w-2 h-2 rounded-full ${t[0]} ${tone === 'ok' ? 'animate-pulse' : ''}`;
+      badge.className = `flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border ${t[2]} bg-slate-900/60 ${t[1]} shrink-0 ml-auto`;
+      text.textContent = label; badge.title = title;
+    };
+    try {
+      const r = await fetch('/api/health', { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      const h = await r.json();
+      h.agent_connected ? set('ok', 'API online · live agent', 'Backend reachable, live agent connected')
+                        : set('mock', 'API online · mock mode', 'Backend reachable, serving mock data (src.agent.run_agent not found)');
+    } catch { set('off', 'API offline', 'Cannot reach /api/health'); }
+  }
+  checkHealth(); setInterval(checkHealth, 30000);
+
+  icons();
+</script>
 </body>
 </html>
