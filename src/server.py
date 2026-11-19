@@ -4,6 +4,8 @@ import importlib
 import inspect
 import logging
 import os
+import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 try:  # load .env automatically (pip install python-dotenv)
@@ -27,12 +29,59 @@ try:
 except ImportError:  # very old FastAPI
     ResponseValidationError = None
 
-AGENT_TIMEOUT_SECONDS = float(os.getenv("AGENT_TIMEOUT_SECONDS", "60"))
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+logger = logging.getLogger("veritas")
+
+# Default 75s = 2 Tavily rounds (2 x 15s) + 1 LLM call (30s) + 15s headroom.
+# TAVILY_TIMEOUT_SECONDS (15) and LLM_TIMEOUT_SECONDS (30) are read by src/agent.py; see .env.example.
+AGENT_TIMEOUT_SECONDS = float(os.getenv("AGENT_TIMEOUT_SECONDS", "75"))
+ALLOW_MOCK_FALLBACK = os.getenv("ALLOW_MOCK_FALLBACK", "false").strip().lower() in ("1", "true", "yes", "on")
 MOCK_LATENCY_SECONDS = float(os.getenv("MOCK_LATENCY_SECONDS", "2.5"))  # lets the UI loading stages show
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Veritas — ODSC × Nebius Research Agent")
+class AgentLoadError(Exception):
+    """src.agent exists but could not be loaded. Details are logged server-side, never sent to clients."""
+
+
+def _load_run_agent():
+    """Return src.agent.run_agent, or None if the module or function does not exist.
+
+    Raises AgentLoadError if src.agent exists but fails to import (syntax error, missing dependency, ...).
+    """
+    try:
+        agent = importlib.import_module("src.agent")
+    except ModuleNotFoundError as exc:
+        if exc.name in ("src.agent", "src"):
+            return None  # the agent simply isn't there yet
+        raise AgentLoadError("src.agent failed to import") from exc
+    except Exception as exc:
+        raise AgentLoadError("src.agent failed to import") from exc
+    fn = getattr(agent, "run_agent", None)
+    return fn if callable(fn) else None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        connected = _load_run_agent() is not None
+    except AgentLoadError:
+        logger.exception("src.agent failed to load; /api/research will return 500 until this is fixed")
+    else:
+        if connected:
+            logger.info("Research agent connected (live mode)")
+        elif ALLOW_MOCK_FALLBACK:
+            logger.warning("src.agent.run_agent not found; serving MOCK data (ALLOW_MOCK_FALLBACK=true)")
+        else:
+            logger.warning("src.agent.run_agent not found and ALLOW_MOCK_FALLBACK is false; /api/research will return 503")
+    yield
+
+
+app = FastAPI(title="Veritas — ODSC × Nebius Research Agent", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -42,8 +91,21 @@ class ResearchRequest(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Error handling: every failure returns JSON with a human-readable `detail`.
+# Error handling: every failure returns JSON with a `detail` string.
+# Full tracebacks go to the server log; clients only get a generic message and a
+# short reference id (`ref`) that matches the log line.
 # --------------------------------------------------------------------------- #
+def _new_error_id() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def _public_error(public_msg: str, log_msg: str, status_code: int = 500) -> HTTPException:
+    """Call inside an `except` block: logs the full traceback, returns a sanitized HTTPException."""
+    error_id = _new_error_id()
+    logger.exception("%s [ref=%s]", log_msg, error_id)
+    return HTTPException(status_code=status_code, detail=f"{public_msg} (ref: {error_id})")
+
+
 @app.exception_handler(RequestValidationError)
 async def _request_validation_handler(request: Request, exc: RequestValidationError):
     parts = []
@@ -57,32 +119,19 @@ if ResponseValidationError is not None:
 
     @app.exception_handler(ResponseValidationError)
     async def _response_validation_handler(request: Request, exc: ResponseValidationError):
-        first = exc.errors()[0] if exc.errors() else {}
-        where = ".".join(str(p) for p in first.get("loc", ()) if p != "response")
+        error_id = _new_error_id()
+        logger.error("Agent output failed ResearchResult validation [ref=%s]: %s", error_id, exc.errors())
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Agent output does not match the ResearchResult schema ({where or 'root'}: {first.get('msg', 'invalid')})."},
+            content={"detail": f"The research agent returned an invalid response. (ref: {error_id})"},
         )
 
 
 @app.exception_handler(Exception)
 async def _unhandled_handler(request: Request, exc: Exception):
-    return JSONResponse(status_code=500, content={"detail": f"Unexpected server error: {type(exc).__name__}: {exc}"})
-
-
-# --------------------------------------------------------------------------- #
-# Agent wiring
-# --------------------------------------------------------------------------- #
-def _get_run_agent():
-    """Return src.agent.run_agent if it exists, else None. Errors inside agent.py still raise."""
-    try:
-        agent = importlib.import_module("src.agent")
-    except ModuleNotFoundError as e:
-        if e.name in ("src.agent", "src"):
-            return None
-        raise
-    fn = getattr(agent, "run_agent", None)
-    return fn if callable(fn) else None
+    error_id = _new_error_id()
+    logger.exception("Unhandled error on %s %s [ref=%s]", request.method, request.url.path, error_id, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": f"Internal server error. (ref: {error_id})"})
 
 
 # --------------------------------------------------------------------------- #
@@ -296,10 +345,13 @@ def serve_home():
 @app.get("/api/health")
 def health_check():
     try:
-        connected = _get_run_agent() is not None
-    except Exception:  # a broken agent module counts as not connected
-        connected = False
-    return {"status": "ok", "agent_connected": connected}
+        agent_connected = _load_run_agent() is not None
+        load_failed = False
+    except AgentLoadError:  # logged at startup and on research requests; not on every health poll
+        agent_connected, load_failed = False, True
+    allow_mock = ALLOW_MOCK_FALLBACK and not load_failed  # a broken agent never falls back to mock
+    mode = "live" if agent_connected else ("mock" if allow_mock else "unavailable")
+    return {"status": "ok", "agent_connected": agent_connected, "mode": mode}
 
 
 @app.post("/api/research", response_model=ResearchResult)
@@ -309,11 +361,13 @@ async def api_research(req: ResearchRequest):
         raise HTTPException(status_code=422, detail="Question must contain at least 5 non-space characters.")
 
     try:
-        run_agent = _get_run_agent()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent failed to load: {type(e).__name__}: {e}")
+        run_agent = _load_run_agent()
+    except AgentLoadError:
+        raise _public_error("The research agent failed to load.", "Failed to load src.agent")
 
     if run_agent is None:
+        if not ALLOW_MOCK_FALLBACK:
+            raise HTTPException(status_code=503, detail="Research agent is unavailable")
         await asyncio.sleep(MOCK_LATENCY_SECONDS)
         return _mock_research(q)
 
@@ -329,11 +383,12 @@ async def api_research(req: ResearchRequest):
     try:
         return await asyncio.wait_for(_call(), timeout=AGENT_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
+        logger.warning("Research agent timed out after %.0fs", AGENT_TIMEOUT_SECONDS)
         raise HTTPException(
             status_code=504,
             detail=f"The research agent took longer than {int(AGENT_TIMEOUT_SECONDS)} seconds. Try a narrower question.",
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent execution failed: {type(e).__name__}: {e}")
+    except Exception:
+        raise _public_error("Research failed due to an internal error.", "Agent execution failed")
