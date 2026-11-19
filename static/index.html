@@ -15,13 +15,13 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   html { scroll-behavior: smooth; }
-  body { background: #070b14; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+  body { background: #070b14; color: #e8edf5; font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv11','ss03'; }
   body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
     background: radial-gradient(60% 40% at 50% -5%, rgba(56,189,248,.10), transparent 70%), radial-gradient(40% 30% at 90% 10%, rgba(99,102,241,.08), transparent 70%); }
   .glass { background: rgba(15,23,42,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(30,41,59,.8); }
   @keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
   .fade-in { animation: fadeUp .5s ease both; }
-  .hero { transition: max-height .6s ease, opacity .4s ease, margin .6s ease; max-height: 700px; overflow: hidden; }
+  .hero { transition: max-height .6s ease, opacity .4s ease, margin .6s ease; max-height: 700px; overflow: hidden; position: relative; isolation: isolate; }
   body.results .hero { max-height: 0; opacity: 0; margin: 0; pointer-events: none; }
   #compactForm { transition: opacity .5s ease .15s; opacity: 0; pointer-events: none; }
   body.results #compactForm { opacity: 1; pointer-events: auto; }
@@ -32,7 +32,8 @@
   .citation-badge:hover { background:#38bdf8; color:#070b14; }
   .flash { animation: flash 1.8s ease; }
   @keyframes flash { 0%,30% { box-shadow: 0 0 0 2px rgba(56,189,248,.9), 0 0 28px rgba(56,189,248,.35); border-color: rgba(56,189,248,.9); } 100% { box-shadow: none; } }
-  .prose-a p { margin-bottom: .85rem; line-height: 1.75; }
+  .prose-a { font-size: 1.0625rem; color: #e8edf5; letter-spacing: -.005em; }
+  .prose-a p { margin-bottom: 1rem; line-height: 1.8; }
   .prose-a ul { list-style: disc; padding-left: 1.4rem; margin-bottom: .85rem; }
   .prose-a ol { list-style: decimal; padding-left: 1.4rem; margin-bottom: .85rem; }
   .prose-a li { margin-bottom: .3rem; line-height: 1.7; }
@@ -43,6 +44,12 @@
   details > summary::-webkit-details-marker { display: none; }
   details[open] .chev { transform: rotate(180deg); }
   .stage-dot { transition: all .4s ease; }
+  .hero-glow { position:absolute; left:50%; top:9.5rem; width:min(54rem,100%); height:22rem; transform:translateX(-50%); z-index:-1; pointer-events:none; filter:blur(48px);
+    background: radial-gradient(42% 55% at 33% 50%, rgba(99,102,241,.32), transparent 70%), radial-gradient(42% 55% at 67% 50%, rgba(34,211,238,.24), transparent 70%);
+    animation: glowDrift 14s ease-in-out infinite alternate; }
+  @keyframes glowDrift { from { opacity:.75; transform:translateX(-52%) scale(.97); } to { opacity:1; transform:translateX(-48%) scale(1.04); } }
+  .meter-seg { transform-origin:left; animation: meterIn .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes meterIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   #drawer { transition: transform .35s ease; }
   :focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
@@ -68,6 +75,10 @@
       </div>
       <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold px-4 py-2 rounded-xl transition cursor-pointer shrink-0">Research</button>
     </form>
+    <div id="healthBadge" class="flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border border-slate-800 bg-slate-900/60 text-slate-400 shrink-0 ml-auto" title="Backend status">
+      <span id="healthDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+      <span id="healthText" class="hidden sm:inline font-mono text-[11px]">checking…</span>
+    </div>
     <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border shrink-0"></div>
   </div>
 </header>
@@ -76,6 +87,7 @@
 
   <!-- Hero -->
   <section class="hero text-center pt-16 sm:pt-28 pb-6">
+    <div class="hero-glow" aria-hidden="true"></div>
     <div class="inline-flex items-center gap-2 text-xs text-slate-400 border border-slate-800/80 rounded-full px-3 py-1 glass mb-6">
       <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Every claim checked against its sources
     </div>
@@ -110,8 +122,8 @@
   <!-- Results -->
   <div id="resultsContainer" class="hidden py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6 min-w-0">
-      <div id="answerCard" class="glass rounded-2xl p-6 fade-in">
-        <p id="questionEcho" class="text-lg font-semibold text-slate-50 mb-4"></p>
+      <div id="answerCard" class="glass rounded-2xl p-6 sm:p-8 fade-in">
+        <p id="questionEcho" class="text-xl sm:text-2xl font-semibold tracking-tight text-slate-50 mb-5"></p>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div class="flex items-center gap-2 text-sm font-medium text-sky-400"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-500 font-normal"></span></div>
           <div class="flex items-center gap-2">
@@ -283,16 +295,19 @@
   };
   const pretty = s => String(s || '').replace(/_/g, ' ');
 
+  function confLevel(c) {
+    if (typeof c === 'number') { const p = c <= 1 ? c * 100 : c; return p >= 75 ? 3 : p >= 45 ? 2 : 1; }
+    const l = String(c || '').toLowerCase();
+    return l === 'high' ? 3 : l === 'medium' ? 2 : l === 'low' ? 1 : 0;
+  }
   function confBadge(c) {
-    let label = c, cls = 'text-slate-300 border-slate-700';
-    if (typeof c === 'number') {
-      const pct = c <= 1 ? Math.round(c * 100) : Math.round(c);
-      label = pct + '%'; cls = pct >= 75 ? 'text-emerald-300 border-emerald-500/30' : pct >= 45 ? 'text-amber-300 border-amber-500/30' : 'text-rose-300 border-rose-500/30';
-    } else if (typeof c === 'string') {
-      const l = c.toLowerCase();
-      cls = l === 'high' ? 'text-emerald-300 border-emerald-500/30' : l === 'medium' ? 'text-amber-300 border-amber-500/30' : l === 'low' ? 'text-rose-300 border-rose-500/30' : cls;
-    }
-    return `<span class="text-[11px] px-2 py-0.5 rounded-md border ${cls} bg-slate-950/40">Confidence: <strong class="font-semibold">${escapeHtml(label ?? 'n/a')}</strong></span>`;
+    const lvl = confLevel(c);
+    const col = lvl === 3 ? ['bg-emerald-400', 'text-emerald-300'] : lvl === 2 ? ['bg-amber-400', 'text-amber-300'] : lvl === 1 ? ['bg-rose-400', 'text-rose-300'] : ['bg-slate-600', 'text-slate-400'];
+    const label = typeof c === 'number' ? (c <= 1 ? Math.round(c * 100) : Math.round(c)) + '%' : (c ?? 'n/a');
+    const segs = [1, 2, 3].map(i => `<span class="meter-seg h-1.5 w-7 rounded-full ${i <= lvl ? col[0] : 'bg-slate-800'}" style="animation-delay:${i * 90}ms"></span>`).join('');
+    return `<div class="flex items-center gap-2.5" title="Confidence: ${escapeHtml(label)}" role="img" aria-label="Confidence: ${escapeHtml(label)}">
+      <div class="flex gap-1">${segs}</div>
+      <span class="text-xs font-medium capitalize ${col[1]}">${escapeHtml(label)} confidence</span></div>`;
   }
 
   function renderReport(data) {
@@ -341,15 +356,15 @@
                 <span class="text-[10px] px-1.5 py-0.5 rounded border ${typeStyles[e.support_type] || typeStyles.contextual}">${escapeHtml(e.support_type || 'contextual')}</span>
                 ${n ? `<a href="#src-${n}" data-cite="${n}" class="citation-badge" title="${escapeHtml(src.title)}">${n}</a><span class="text-[11px] text-slate-500 font-mono truncate">${escapeHtml(src.domain)}</span>` : `<span class="text-[11px] text-slate-500 font-mono">${escapeHtml(e.source_id)}</span>`}
               </div>
-              <p class="text-[13px] text-slate-300 leading-relaxed">“${escapeHtml(e.excerpt)}”</p>
+              <p class="text-[13.5px] text-slate-200 leading-relaxed">“${escapeHtml(e.excerpt)}”</p>
             </div>`;
           }).join('');
-          return `<div class="glass rounded-xl p-4 fade-in">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+          return `<div class="glass rounded-xl p-5 fade-in">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3.5">
               <span class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${vcls}"><i data-lucide="${vicon}" class="w-3.5 h-3.5"></i>${escapeHtml(pretty(c.verification_status))}</span>
               ${confBadge(c.confidence)}
             </div>
-            <p class="text-sm text-slate-100 font-medium leading-relaxed">${escapeHtml(c.text)}</p>
+            <p class="text-[15px] text-slate-50 font-medium leading-relaxed">${escapeHtml(c.text)}</p>
             ${ev.length ? `<details class="mt-3 group" ${ev.length <= 1 ? 'open' : ''}>
               <summary class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-sky-300 transition select-none">
                 <i data-lucide="chevron-down" class="chev w-3.5 h-3.5 transition-transform"></i> ${ev.length} evidence quote${ev.length > 1 ? 's' : ''}
@@ -429,6 +444,25 @@
   $('closeDrawer').addEventListener('click', () => toggleDrawer(false));
   $('drawerBackdrop').addEventListener('click', () => toggleDrawer(false));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleDrawer(false); });
+
+  /* ---------- backend health badge ---------- */
+  async function checkHealth() {
+    const badge = $('healthBadge'), dot = $('healthDot'), text = $('healthText');
+    const set = (tone, label, title) => {
+      const t = { ok: ['bg-emerald-400', 'text-emerald-300', 'border-emerald-500/30'], mock: ['bg-amber-400', 'text-amber-300', 'border-amber-500/30'], off: ['bg-rose-500', 'text-rose-300', 'border-rose-500/30'] }[tone];
+      dot.className = `w-2 h-2 rounded-full ${t[0]} ${tone === 'ok' ? 'animate-pulse' : ''}`;
+      badge.className = `flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border ${t[2]} bg-slate-900/60 ${t[1]} shrink-0 ml-auto`;
+      text.textContent = label; badge.title = title;
+    };
+    try {
+      const r = await fetch('/api/health', { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      const h = await r.json();
+      h.agent_connected ? set('ok', 'API online · live agent', 'Backend reachable, live agent connected')
+                        : set('mock', 'API online · mock mode', 'Backend reachable, serving mock data (src.agent.run_agent not found)');
+    } catch { set('off', 'API offline', 'Cannot reach /api/health'); }
+  }
+  checkHealth(); setInterval(checkHealth, 30000);
 
   icons();
 </script>
