@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 """Veritas FastAPI server implementing the frozen ResearchResult contract."""
 import asyncio
 import importlib

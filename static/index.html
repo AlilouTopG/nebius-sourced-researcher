@@ -27,19 +27,50 @@
   body.results #compactForm { opacity: 1; pointer-events: auto; }
   body.results #brandText { display: none; }
   @media (min-width: 640px) { body.results #brandText { display: block; } }
-  .citation-badge { display:inline-flex; align-items:center; justify-content:center; min-width:1.35rem; height:1.35rem; padding:0 5px; margin:0 2px; vertical-align:baseline;
-    font: 600 .7rem 'JetBrains Mono', monospace; color:#38bdf8; background:rgba(56,189,248,.12); border:1px solid rgba(56,189,248,.35); border-radius:6px; cursor:pointer; text-decoration:none; transition:.15s; }
-  .citation-badge:hover { background:#38bdf8; color:#070b14; }
+  .citation-badge { display:inline-flex; align-items:center; justify-content:center; min-width:1.4rem; height:1.4rem; padding:0 .45rem; margin:0 .12rem; vertical-align:.08em; line-height:1;
+    font: 600 .68rem 'JetBrains Mono', monospace; color:#67e8f9; background:linear-gradient(180deg, rgba(34,211,238,.20), rgba(56,189,248,.09)); border:1px solid rgba(34,211,238,.42);
+    border-radius:999px; cursor:pointer; text-decoration:none; transition: background .15s, color .15s, box-shadow .15s, transform .15s; }
+  .citation-badge:hover { background:#22d3ee; color:#042f3a; box-shadow:0 0 14px rgba(34,211,238,.45); transform: translateY(-1px); }
   .flash { animation: flash 1.8s ease; }
   @keyframes flash { 0%,30% { box-shadow: 0 0 0 2px rgba(56,189,248,.9), 0 0 28px rgba(56,189,248,.35); border-color: rgba(56,189,248,.9); } 100% { box-shadow: none; } }
-  .prose-a { font-size: 1.0625rem; color: #e8edf5; letter-spacing: -.005em; }
-  .prose-a p { margin-bottom: 1rem; line-height: 1.8; }
-  .prose-a ul { list-style: disc; padding-left: 1.4rem; margin-bottom: .85rem; }
-  .prose-a ol { list-style: decimal; padding-left: 1.4rem; margin-bottom: .85rem; }
-  .prose-a li { margin-bottom: .3rem; line-height: 1.7; }
-  .prose-a strong { color: #f8fafc; font-weight: 600; }
-  .prose-a h1,.prose-a h2,.prose-a h3 { color:#f1f5f9; font-weight:600; margin: 1rem 0 .5rem; }
+  .prose-a { font-size: 1.0625rem; color:#e8edf5; letter-spacing:-.005em; line-height:1.7; overflow-wrap:anywhere; }
+  .prose-a > :first-child { margin-top:0 !important; }
+  .prose-a > :last-child { margin-bottom:0 !important; }
+  .prose-a p { margin:0 0 1rem; line-height:1.75; }
+  .prose-a strong { color:#f8fafc; font-weight:600; }
+  .prose-a em { color:#cbd5e1; }
+  .prose-a h1 { font-size:1.5rem; font-weight:700; color:#f8fafc; margin:2rem 0 .85rem; line-height:1.25; letter-spacing:-.02em; }
+  .prose-a h2 { font-size:1.3rem; font-weight:650; color:#f8fafc; margin:2rem 0 .75rem; padding-bottom:.45rem; border-bottom:1px solid rgba(30,41,59,.9); line-height:1.3; letter-spacing:-.01em; }
+  .prose-a h3 { font-size:1.125rem; font-weight:600; color:#f1f5f9; margin:1.6rem 0 .5rem; line-height:1.35; }
+  .prose-a h4 { font-size:.78rem; font-weight:600; color:#38bdf8; margin:1.4rem 0 .45rem; letter-spacing:.07em; text-transform:uppercase; }
+  .prose-a ul, .prose-a ol { margin:0 0 1rem; padding-left:1.5rem; }
+  .prose-a ul { list-style:disc; }
+  .prose-a ol { list-style:decimal; }
+  .prose-a li { margin-bottom:.4rem; line-height:1.7; padding-left:.2rem; }
+  .prose-a li::marker { color:#38bdf8; }
+  .prose-a li > ul, .prose-a li > ol { margin:.4rem 0 .2rem; }
+  .prose-a li > p { margin-bottom:.4rem; }
+  .prose-a blockquote { margin:1.25rem 0; padding:.75rem 1rem .75rem 1.1rem; border-left:3px solid rgba(56,189,248,.6); background:rgba(56,189,248,.05); border-radius:0 10px 10px 0; color:#cbd5e1; }
+  .prose-a blockquote p:last-child { margin-bottom:0; }
+  .prose-a hr { border:0; border-top:1px solid rgba(30,41,59,.9); margin:1.75rem 0; }
+  .prose-a a:not(.citation-badge) { color:#38bdf8; text-decoration:underline; text-decoration-color:rgba(56,189,248,.4); text-underline-offset:3px; transition:.15s; }
+  .prose-a a:not(.citation-badge):hover { color:#7dd3fc; text-decoration-color:currentColor; }
+  .prose-a img { max-width:100%; border-radius:10px; }
+  .prose-a pre { margin:1.25rem 0; padding:.9rem 1rem; overflow-x:auto; background:rgba(2,6,23,.7); border:1px solid rgba(30,41,59,.9); border-radius:12px; font-size:.85rem; line-height:1.6; }
+  .prose-a pre code { background:none; padding:0; }
   .prose-a code { font-family:'JetBrains Mono',monospace; font-size:.85em; background:rgba(30,41,59,.8); padding:1px 5px; border-radius:4px; }
+  /* tables */
+  .prose-a .table-wrap { overflow-x:auto; margin:1.25rem 0; border:1px solid rgba(51,65,85,.8); border-radius:12px; background:rgba(2,6,23,.35); -webkit-overflow-scrolling:touch; }
+  .prose-a table { width:100%; min-width:28rem; border-collapse:collapse; font-size:.92rem; line-height:1.55; overflow-wrap:normal; }
+  .prose-a th, .prose-a td { padding:10px 14px; text-align:left; vertical-align:top; border:1px solid rgba(30,41,59,.95); }
+  .prose-a thead th { background:rgba(15,23,42,.95); color:#cbd5e1; font-weight:600; font-size:.8rem; letter-spacing:.02em; border-bottom:1px solid #334155; white-space:nowrap; }
+  .prose-a tbody tr:nth-child(even) td { background:rgba(15,23,42,.38); }
+  .prose-a tbody tr:hover td { background:rgba(56,189,248,.06); }
+  .prose-a th:first-child, .prose-a td:first-child { border-left:0; }
+  .prose-a th:last-child, .prose-a td:last-child { border-right:0; }
+  .prose-a thead tr:first-child th { border-top:0; }
+  .prose-a tbody tr:last-child td { border-bottom:0; }
+  .prose-a td:first-child { color:#f1f5f9; font-weight:500; }
   details > summary { list-style: none; cursor: pointer; }
   details > summary::-webkit-details-marker { display: none; }
   details[open] .chev { transform: rotate(180deg); }
@@ -142,6 +173,7 @@
 
       <section class="space-y-3">
         <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-slate-400"></i> Claim verification <span class="text-slate-500 font-normal">(<span id="claimCount">0</span>)</span></h2>
+        <div id="claimFilters" class="hidden flex flex-wrap gap-2" role="group" aria-label="Filter claims by verification status"></div>
         <div id="claimsList" class="space-y-3"></div>
       </section>
     </div>
@@ -310,42 +342,71 @@
       <span class="text-xs font-medium capitalize ${col[1]}">${escapeHtml(label)} confidence</span></div>`;
   }
 
-  function renderReport(data) {
-    lastData = data;
-    const sources = data.sources || [];
-    lastSources = sources;
-    const idx = {}; sources.forEach((s, i) => { idx[s.id] = i + 1; });
-
-    // status pill + meta
-    const st = data.status || 'partial';
-    $('statusPill').className = `text-xs px-3 py-1 rounded-full font-medium border shrink-0 ${statusStyles[st] || statusStyles.partial}`;
-    $('statusPill').textContent = pretty(st);
-    $('questionEcho').textContent = data.question || $('compactInput').value;
-    $('roundsBadge').textContent = `${data.search_rounds || 1} search round${(data.search_rounds || 1) > 1 ? 's' : ''}`;
-    $('metaRow').innerHTML = [
-      data.research_id && `<span>id: ${escapeHtml(data.research_id)}</span>`,
-      data.generated_at && `<span>${escapeHtml(new Date(data.generated_at).toLocaleString())}</span>`
-    ].filter(Boolean).join('');
-
-    // answer with interactive citations
-    let html = marked.parse(data.answer || '');
-    html = html.replace(/\[(\d+)\]/g, (m, n) => {
-      const src = sources[+n - 1];
-      return src ? `<a href="#src-${n}" data-cite="${n}" class="citation-badge" title="${escapeHtml(src.title)}">${n}</a>` : m;
+  /* ---------- sanitizing + citation linking for the answer ---------- */
+  function sanitizeHtml(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,svg,math').forEach(n => n.remove());
+    doc.body.querySelectorAll('*').forEach(el => {
+      [...el.attributes].forEach(at => {
+        const n = at.name.toLowerCase(), v = at.value.trim().toLowerCase();
+        if (n.startsWith('on') || n === 'style' || ((n === 'href' || n === 'src') && /^(javascript|data|vbscript):/.test(v))) el.removeAttribute(at.name);
+      });
+      if (el.tagName === 'A') { el.target = '_blank'; el.rel = 'noopener noreferrer'; }
     });
-    $('answerContent').innerHTML = html;
+    return doc.body.innerHTML;
+  }
 
-    // limitations
-    const lims = data.limitations || [];
-    $('limitationsList').innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
-    $('limitationsBox').classList.toggle('hidden', !lims.length);
+  // "1" or "S1" -> 1-based source number (matches a source id first, then falls back to the number)
+  function resolveCite(token, sources) {
+    const t = token.trim();
+    const byId = sources.findIndex(s => String(s.id).toLowerCase() === t.toLowerCase());
+    if (byId >= 0) return byId + 1;
+    const m = t.match(/^S?(\d+)$/i);
+    const n = m ? parseInt(m[1], 10) : 0;
+    return n >= 1 && n <= sources.length ? n : 0;
+  }
 
-    // claims
-    const claims = data.claims || [];
-    $('claimCount').textContent = claims.length;
-    $('claimsList').innerHTML = claims.length === 0
-      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims were extracted for this answer.</div>`
-      : claims.map(c => {
+  // Turns [1], [S1] and [S1, S2] in text nodes into clickable badges (skips links and code).
+  function linkCitations(root, sources) {
+    const re = /\[\s*(S?\d+(?:\s*[,;]\s*S?\d+)*)\s*\]/gi;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => n.parentElement && n.parentElement.closest('a,code,pre') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const text = node.nodeValue; re.lastIndex = 0;
+      if (!re.test(text)) return;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment(); let last = 0, m;
+      while ((m = re.exec(text))) {
+        const nums = m[1].split(/\s*[,;]\s*/).map(t => resolveCite(t, sources));
+        if (nums.some(n => !n)) continue; // unknown reference: leave the text as written
+        frag.append(text.slice(last, m.index));
+        [...new Set(nums)].forEach(n => {
+          const a = document.createElement('a');
+          a.href = '#src-' + n; a.className = 'citation-badge'; a.dataset.cite = n;
+          a.title = sources[n - 1].title || ''; a.textContent = n;
+          frag.append(a);
+        });
+        last = m.index + m[0].length;
+      }
+      frag.append(text.slice(last));
+      node.replaceWith(frag);
+    });
+  }
+
+  /* ---------- claim cards + filter pills ---------- */
+  let claimFilter = 'all';
+  const FILTERS = [
+    ['all', 'All', 'border-sky-500/50 bg-sky-500/10 text-sky-300'],
+    ['supported', 'Supported', 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'],
+    ['partially_supported', 'Partially supported', 'border-amber-500/40 bg-amber-500/10 text-amber-300'],
+    ['contradicted', 'Contradicted', 'border-rose-500/40 bg-rose-500/10 text-rose-300'],
+    ['unverified', 'Unverified', 'border-slate-500/50 bg-slate-700/30 text-slate-200']
+  ];
+  const claimKey = c => ['supported', 'partially_supported', 'contradicted'].includes(c.verification_status) ? c.verification_status : 'unverified';
+
+  const claimCard = (c, sources, idx) => {
           const [vcls, vicon] = verStyles[c.verification_status] || verStyles.unverified;
           const ev = c.evidence || [];
           const evHtml = ev.map(e => {
@@ -372,7 +433,65 @@
               <div class="mt-2 space-y-2">${evHtml}</div>
             </details>` : `<p class="mt-3 text-xs text-slate-500">No evidence quotes attached.</p>`}
           </div>`;
-        }).join('');
+  };
+
+  function renderClaims() {
+    const claims = (lastData && lastData.claims) || [];
+    const sources = lastSources, idx = {};
+    sources.forEach((s, i) => { idx[s.id] = i + 1; });
+    const count = k => k === 'all' ? claims.length : claims.filter(c => claimKey(c) === k).length;
+
+    $('claimFilters').classList.toggle('hidden', claims.length === 0);
+    $('claimFilters').innerHTML = FILTERS.map(([k, label, on]) => {
+      const n = count(k), active = k === claimFilter;
+      return `<button type="button" data-filter="${k}" aria-pressed="${active}" ${n === 0 && k !== 'all' ? 'disabled' : ''}
+        class="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border transition ${active ? on : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:border-slate-600'} disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer">
+        ${label}<span class="font-mono text-[11px] px-1.5 rounded bg-black/30">${n}</span></button>`;
+    }).join('');
+
+    const shown = claimFilter === 'all' ? claims : claims.filter(c => claimKey(c) === claimFilter);
+    $('claimsList').innerHTML = claims.length === 0
+      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims were extracted for this answer.</div>`
+      : shown.length === 0
+        ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims match this filter.</div>`
+        : shown.map(c => claimCard(c, sources, idx)).join('');
+  }
+
+  function renderReport(data) {
+    lastData = data;
+    const sources = data.sources || [];
+    lastSources = sources;
+    const idx = {}; sources.forEach((s, i) => { idx[s.id] = i + 1; });
+
+    // status pill + meta
+    const st = data.status || 'partial';
+    $('statusPill').className = `text-xs px-3 py-1 rounded-full font-medium border shrink-0 ${statusStyles[st] || statusStyles.partial}`;
+    $('statusPill').textContent = pretty(st);
+    $('questionEcho').textContent = data.question || $('compactInput').value;
+    $('roundsBadge').textContent = `${data.search_rounds || 1} search round${(data.search_rounds || 1) > 1 ? 's' : ''}`;
+    $('metaRow').innerHTML = [
+      data.research_id && `<span>id: ${escapeHtml(data.research_id)}</span>`,
+      data.generated_at && `<span>${escapeHtml(new Date(data.generated_at).toLocaleString())}</span>`
+    ].filter(Boolean).join('');
+
+    // answer: markdown -> sanitized HTML, scrollable tables, clickable citation badges
+    const answerEl = $('answerContent');
+    answerEl.innerHTML = sanitizeHtml(marked.parse(data.answer || ''));
+    answerEl.querySelectorAll('table').forEach(t => {
+      const wrap = document.createElement('div'); wrap.className = 'table-wrap';
+      t.parentNode.insertBefore(wrap, t); wrap.appendChild(t);
+    });
+    linkCitations(answerEl, sources);
+
+    // limitations
+    const lims = data.limitations || [];
+    $('limitationsList').innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+    $('limitationsBox').classList.toggle('hidden', !lims.length);
+
+    // claims
+    claimFilter = 'all';
+    $('claimCount').textContent = (data.claims || []).length;
+    renderClaims();
 
     // sources
     $('sourceCount').textContent = sources.length;
@@ -406,6 +525,12 @@
     const card = $('src-' + a.dataset.cite); if (!card) return;
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+  });
+
+  $('claimFilters').addEventListener('click', e => {
+    const b = e.target.closest('[data-filter]');
+    if (!b || b.disabled) return;
+    claimFilter = b.dataset.filter; renderClaims(); icons();
   });
 
   /* ---------- copy markdown / JSON ---------- */
