@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Veritas — Sourced Research Agent</title>
+  <title>Veritas — Evidence-Grounded Research Agent</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
@@ -14,109 +14,106 @@
       border: 1px solid rgba(56, 189, 248, 0.4);
       font-size: 0.75rem; font-weight: 700; padding: 0 5px;
       border-radius: 4px; margin: 0 2px; cursor: pointer; text-decoration: none;
-      transition: all 0.15s;
     }
     .citation-badge:hover { background: #38bdf8; color: #090d16; }
-    .prose p { margin-bottom: 0.85rem; line-height: 1.7; }
-    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.85rem; }
-    .prose li { margin-bottom: 0.35rem; }
+    .prose p { margin-bottom: 0.75rem; line-height: 1.65; }
+    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
     .prose strong { color: #f8fafc; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- Top Bar -->
-  <header class="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
-    <div class="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center font-bold text-slate-950">V</div>
         <div>
           <h1 class="font-bold text-slate-100 leading-tight">Veritas Research Agent</h1>
-          <p class="text-xs text-slate-400">Nebius Token Factory × Tavily Real-Time Search</p>
+          <p class="text-xs text-slate-400">Nebius Token Factory × Tavily Search</p>
         </div>
       </div>
-      <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-        Verifiable Citations Active
-      </span>
+      <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border"></div>
     </div>
   </header>
 
-  <!-- Main Workspace -->
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-    
-    <!-- Search Input -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+    <!-- Input Box -->
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
       <form id="researchForm" class="flex flex-col sm:flex-row gap-3">
         <input
           id="questionInput"
           type="text"
-          placeholder="Ask any complex research question requiring live, verifiable sources..."
+          minlength="5"
+          placeholder="Ask a research question requiring verifiable sources and claim-level evidence..."
           class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
           required
         />
         <button
           id="submitBtn"
           type="submit"
-          class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-6 py-3 rounded-xl transition flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-6 py-3 rounded-xl transition shrink-0 cursor-pointer"
         >
-          <span>Research</span>
+          Research
         </button>
       </form>
 
-      <!-- Quick Test Presets (Great for Demo Video) -->
       <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-        <span>Try:</span>
-        <button type="button" onclick="setQuery('What are the key differences between Llama 3.3 70B and Qwen 2.5 72B in coding benchmarks?')" class="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 transition">
-          Model Benchmarks
+        <span>Presets:</span>
+        <button type="button" onclick="setQuery('What are the main drivers of urban heat islands?')" class="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300">
+          Urban Heat Islands
         </button>
-        <button type="button" onclick="setQuery('How does Tavily search API optimize web retrieval for LLM agents?')" class="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 transition">
-          Tavily Architecture
-        </button>
-        <button type="button" onclick="setQuery('What was the exact final score of the 2029 Mars Colonial Cup final?')" class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition">
-          Test Failure Case (No Evidence)
+        <button type="button" onclick="setQuery('What was the exact score of the 2029 Mars Colonial Cup final?')" class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          Test Insufficient Evidence
         </button>
       </div>
     </div>
 
-    <!-- Loading Pipeline Trace -->
+    <!-- Error Banner -->
+    <div id="errorBox" class="hidden mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-sm"></div>
+
+    <!-- Loading Indicator -->
     <div id="loadingBox" class="hidden mt-8 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
       <div class="flex items-center gap-3 text-sky-400 font-medium">
         <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span id="loadingText">Step 1/3: Planning targeted search queries via Nebius Token Factory...</span>
+        <span id="loadingText">Planning search queries & gathering verifiable evidence...</span>
       </div>
     </div>
 
-    <!-- Results Grid -->
+    <!-- Report Layout -->
     <div id="resultsContainer" class="hidden mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- Left 2 Cols: Agent Trace + Synthesized Answer -->
-      <div class="lg:col-span-2 space-y-5">
+      <!-- Left 2 Cols: Answer + Limitations + Claim Cards -->
+      <div class="lg:col-span-2 space-y-6">
         
-        <!-- Agent Execution Trace -->
-        <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Agent Query Plan</span>
-            <span id="modelBadge" class="text-xs text-slate-500 font-mono"></span>
+        <!-- Synthesized Answer -->
+        <div id="answerCard" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-sky-400">Synthesized Answer</h2>
+            <span id="roundsBadge" class="text-xs text-slate-500"></span>
           </div>
-          <div id="queriesList" class="flex flex-wrap gap-2"></div>
+          <div id="answerContent" class="prose text-slate-200 text-base"></div>
         </div>
 
-        <!-- Answer Card -->
-        <div id="answerCard" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-lg">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-sky-400 mb-4">Synthesized Research Answer</h2>
-          <div id="answerContent" class="prose text-slate-200 text-base"></div>
+        <!-- Limitations Box -->
+        <div id="limitationsBox" class="hidden bg-amber-950/20 border border-amber-500/40 rounded-xl p-4">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2">Evidence Limitations & Uncertainty</h3>
+          <ul id="limitationsList" class="list-disc pl-5 text-xs text-amber-200/90 space-y-1"></ul>
+        </div>
+
+        <!-- Claim Verification Cards -->
+        <div id="claimsSection" class="space-y-3">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Claim-Level Verification (<span id="claimCount">0</span>)</h2>
+          <div id="claimsList" class="space-y-3"></div>
         </div>
       </div>
 
-      <!-- Right Col: Verifiable Sources -->
+      <!-- Right Col: Source Cards -->
       <div class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">Verified Sources (<span id="sourceCount">0</span>)</h2>
-          <span class="text-xs text-slate-500">Click to inspect</span>
-        </div>
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Verified Sources (<span id="sourceCount">0</span>)</h2>
         <div id="sourcesList" class="space-y-3"></div>
       </div>
 
@@ -124,9 +121,7 @@
   </main>
 
   <script>
-    function setQuery(text) {
-      document.getElementById('questionInput').value = text;
-    }
+    function setQuery(q) { document.getElementById('questionInput').value = q; }
 
     document.getElementById('researchForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -135,22 +130,14 @@
 
       const btn = document.getElementById('submitBtn');
       const loadingBox = document.getElementById('loadingBox');
-      const loadingText = document.getElementById('loadingText');
       const resultsContainer = document.getElementById('resultsContainer');
+      const errorBox = document.getElementById('errorBox');
 
       btn.disabled = true;
       btn.classList.add('opacity-50');
+      errorBox.classList.add('hidden');
       resultsContainer.classList.add('hidden');
       loadingBox.classList.remove('hidden');
-
-      // Simulated step progress feedback
-      loadingText.textContent = "Step 1/3: Planning targeted search queries via Nebius Token Factory...";
-      const t1 = setTimeout(() => {
-        loadingText.textContent = "Step 2/3: Retrieving & deduplicating live web sources via Tavily...";
-      }, 1500);
-      const t2 = setTimeout(() => {
-        loadingText.textContent = "Step 3/3: Synthesizing grounded answer with inline citations...";
-      }, 3500);
 
       try {
         const res = await fetch('/api/research', {
@@ -159,12 +146,11 @@
           body: JSON.stringify({ question })
         });
         const data = await res.json();
-
-        clearTimeout(t1);
-        clearTimeout(t2);
-        renderResults(data);
+        if (!res.ok) throw new Error(data.detail || 'API Error');
+        renderReport(data);
       } catch (err) {
-        alert("Error running research agent: " + err.message);
+        errorBox.textContent = "Error: " + err.message;
+        errorBox.classList.remove('hidden');
       } finally {
         loadingBox.classList.add('hidden');
         btn.disabled = false;
@@ -172,65 +158,105 @@
       }
     });
 
-    function renderResults(data) {
+    function renderReport(data) {
       const resultsContainer = document.getElementById('resultsContainer');
-      const queriesList = document.getElementById('queriesList');
+      const statusPill = document.getElementById('statusPill');
+      const roundsBadge = document.getElementById('roundsBadge');
       const answerContent = document.getElementById('answerContent');
-      const answerCard = document.getElementById('answerCard');
+      const limitationsBox = document.getElementById('limitationsBox');
+      const limitationsList = document.getElementById('limitationsList');
+      const claimsList = document.getElementById('claimsList');
+      const claimCount = document.getElementById('claimCount');
       const sourcesList = document.getElementById('sourcesList');
       const sourceCount = document.getElementById('sourceCount');
-      const modelBadge = document.getElementById('modelBadge');
 
-      modelBadge.textContent = data.model_used || '';
+      // Status Pill
+      const statusStyles = {
+        success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+        partial: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+        insufficient_evidence: 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+      };
+      statusPill.className = `text-xs px-3 py-1 rounded-full font-medium border ${statusStyles[data.status] || statusStyles.partial}`;
+      statusPill.textContent = `Status: ${data.status.replace('_', ' ')}`;
+      statusPill.classList.remove('hidden');
 
-      // Render planned queries
-      queriesList.innerHTML = (data.planned_queries || []).map(q =>
-        `<span class="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-sky-300 border border-slate-700">🔍 ${escapeHtml(q)}</span>`
-      ).join('');
+      roundsBadge.textContent = `Search rounds: ${data.search_rounds || 1}`;
 
-      // Highlight insufficient evidence card border
-      if (data.insufficient_evidence) {
-        answerCard.classList.remove('border-slate-800');
-        answerCard.classList.add('border-amber-500/60', 'bg-amber-950/10');
-      } else {
-        answerCard.classList.add('border-slate-800');
-        answerCard.classList.remove('border-amber-500/60', 'bg-amber-950/10');
-      }
+      // Map source_id -> index for [1], [2] citations
+      const sources = data.sources || [];
+      const sourceIndexMap = {};
+      sources.forEach((s, idx) => { sourceIndexMap[s.id] = idx + 1; });
 
-      // Render Markdown answer and turn [1], [2] into clickable source links
+      // Answer with clickable [n] citations
       let html = marked.parse(data.answer || '');
       html = html.replace(/\[(\d+)\]/g, (match, num) => {
-        const idx = parseInt(num, 10) - 1;
-        const src = data.sources && data.sources[idx];
-        if (src) {
-          return `<a href="${src.url}" target="_blank" rel="noopener noreferrer" class="citation-badge" title="${escapeHtml(src.title)}">[${num}]</a>`;
-        }
-        return match;
+        const src = sources[parseInt(num, 10) - 1];
+        return src
+          ? `<a href="${src.url}" target="_blank" rel="noopener noreferrer" class="citation-badge" title="${escapeHtml(src.title)}">[${num}]</a>`
+          : match;
       });
       answerContent.innerHTML = html;
 
-      // Render Source Cards
-      const sources = data.sources || [];
-      sourceCount.textContent = sources.length;
-      if (sources.length === 0) {
-        sourcesList.innerHTML = `<div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">No high-confidence sources passed the relevance filter.</div>`;
+      // Limitations
+      const lims = data.limitations || [];
+      if (lims.length > 0) {
+        limitationsList.innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+        limitationsBox.classList.remove('hidden');
       } else {
-        sourcesList.innerHTML = sources.map((s, i) => `
-          <a href="${s.url}" target="_blank" rel="noopener noreferrer"
-             class="block p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/60 transition group">
-            <div class="flex items-center justify-between gap-2 mb-1.5">
-              <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">[${i + 1}] ${escapeHtml(s.domain)}</span>
-              <span class="text-[11px] text-slate-500">Score: ${s.score}</span>
-            </div>
-            <h3 class="text-sm font-medium text-slate-200 group-hover:text-sky-400 transition line-clamp-2 mb-1.5">
-              ${escapeHtml(s.title)}
-            </h3>
-            <p class="text-xs text-slate-400 line-clamp-3 leading-relaxed">
-              ${escapeHtml(s.content)}
-            </p>
-          </a>
-        `).join('');
+        limitationsBox.classList.add('hidden');
       }
+
+      // Claim Cards
+      const claims = data.claims || [];
+      claimCount.textContent = claims.length;
+      const verColors = {
+        supported: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        partially_supported: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        contradicted: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+        unverified: 'bg-slate-700/40 text-slate-400 border-slate-600'
+      };
+
+      claimsList.innerHTML = claims.length === 0
+        ? `<div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">No verified claims extracted.</div>`
+        : claims.map(c => {
+            const evHtml = (c.evidence || []).map(ev => {
+              const num = sourceIndexMap[ev.source_id] || '?';
+              return `
+                <div class="mt-2 pl-3 border-l-2 border-sky-500/50 text-xs text-slate-300 bg-slate-950/60 p-2 rounded-r">
+                  <span class="text-sky-400 font-semibold">[${num}] (${ev.support_type}):</span>
+                  "${escapeHtml(ev.excerpt)}"
+                </div>`;
+            }).join('');
+
+            return `
+              <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <span class="text-[11px] px-2 py-0.5 rounded border font-semibold uppercase ${verColors[c.verification_status] || verColors.unverified}">
+                    ${c.verification_status.replace('_', ' ')}
+                  </span>
+                  <span class="text-xs text-slate-400">Confidence: <strong class="text-slate-200">${c.confidence}</strong></span>
+                </div>
+                <p class="text-sm text-slate-100 font-medium">${escapeHtml(c.text)}</p>
+                ${evHtml}
+              </div>`;
+          }).join('');
+
+      // Source Cards
+      sourceCount.textContent = sources.length;
+      sourcesList.innerHTML = sources.length === 0
+        ? `<div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">No external sources cited.</div>`
+        : sources.map((s, i) => `
+            <a href="${s.url}" target="_blank" rel="noopener noreferrer"
+               class="block p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/60 transition group">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">[${i + 1}] ${escapeHtml(s.domain)}</span>
+                <span class="text-[11px] text-slate-500 font-mono">${escapeHtml(s.id)}</span>
+              </div>
+              <h3 class="text-sm font-medium text-slate-200 group-hover:text-sky-400 transition line-clamp-2">
+                ${escapeHtml(s.title)} ↗
+              </h3>
+            </a>
+          `).join('');
 
       resultsContainer.classList.remove('hidden');
     }
