@@ -1189,13 +1189,60 @@ def detect_numerical_conflicts(
         )
         for source in sources
     }
-    provenance_keys = {}
+    legacy_identifier_types = {
+        "provenance_id": "publication_identity",
+        "publication_id": "publication_identity",
+        "originating_publication": "publication_identity",
+    }
+    legacy_identifiers = {}
     for source_id, source in source_by_id.items():
-        for field in ("provenance_id", "publication_id", "originating_publication"):
+        identities = set()
+        for field, identifier_type in legacy_identifier_types.items():
             value = source.get(field)
             if isinstance(value, str) and value.strip():
-                provenance_keys[source_id] = value.strip().lower()
-                break
+                identities.add((identifier_type, value.strip().lower()))
+        legacy_identifiers[source_id] = identities
+
+    relationship_values = {"same_publication", "distinct_publications", "unknown"}
+
+    def nested_relationship(source_id: str, other_source_id: str) -> str | None:
+        observed = []
+        for current_id, other_id in (
+            (source_id, other_source_id),
+            (other_source_id, source_id),
+        ):
+            metadata = source_by_id.get(current_id, {}).get("publication_metadata")
+            relationships = metadata.get("relationships") if isinstance(metadata, dict) else None
+            if not isinstance(relationships, dict) or other_id not in relationships:
+                continue
+            relationship = relationships[other_id]
+            observed.append(
+                relationship
+                if isinstance(relationship, str) and relationship in relationship_values
+                else "unknown"
+            )
+        if not observed:
+            return None
+        if len(observed) == 2 and observed[0] == observed[1]:
+            return observed[0]
+        return "unknown"
+
+    def pair_relationship(source_id: str, other_source_id: str) -> str:
+        nested = nested_relationship(source_id, other_source_id)
+        if nested is not None:
+            return nested
+        left = legacy_identifiers.get(source_id, set())
+        right = legacy_identifiers.get(other_source_id, set())
+        if left & right:
+            return "same_publication"
+        if any(
+            left_type == right_type
+            for left_type, _ in left
+            for right_type, _ in right
+        ):
+            return "distinct_publications"
+        return "unknown"
+
     pattern = re.compile(
         r"(?<![\w])(-?\d+(?:\.\d+)?)\s*(ppm|ppb|percent|%)",
         re.IGNORECASE,
@@ -1218,7 +1265,6 @@ def detect_numerical_conflicts(
                     "context": context,
                     "source_id": evidence.source_id,
                     "source_role": source_roles.get(evidence.source_id),
-                    "provenance_key": provenance_keys.get(evidence.source_id),
                 })
 
     summaries: List[str] = []
@@ -1271,18 +1317,19 @@ def detect_numerical_conflicts(
             for finding in comparable
             if finding["source_id"] in source_ids
         }
-        independent_provenance = {
-            finding["provenance_key"]
-            for finding in comparable
-            if finding["provenance_key"]
-        }
-        has_complete_provenance = (
-            all(finding["provenance_key"] for finding in comparable)
-            and len(independent_provenance) >= 2
+        relationship_pairs = [
+            pair_relationship(source_id, other_source_id)
+            for index, source_id in enumerate(sorted(source_ids))
+            for other_source_id in sorted(source_ids)[index + 1:]
+        ]
+        all_distinct_publications = (
+            bool(relationship_pairs)
+            and all(
+                relationship == "distinct_publications"
+                for relationship in relationship_pairs
+            )
         )
-        if roles == {"primary"} and has_complete_provenance:
-            label = "Potential genuine conflict candidate (potential discrepancy)"
-        elif has_complete_provenance:
+        if all_distinct_publications:
             label = "Potential comparable-value discrepancy"
         else:
             label = "Unresolved numerical discrepancy (potential conflict)"
