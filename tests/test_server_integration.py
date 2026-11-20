@@ -102,7 +102,7 @@ class ServerIntegrationTests(unittest.TestCase):
                 json={"question": "A valid research question"},
             )
         self.assertEqual(response.status_code, 500)
-        self.assertIn("Agent output does not match", response.json()["detail"])
+        self.assertIn("invalid response", response.json()["detail"].lower())
 
     def test_agent_exception_returns_500_detail(self):
         with patch.object(
@@ -115,7 +115,7 @@ class ServerIntegrationTests(unittest.TestCase):
                 json={"question": "A valid research question"},
             )
         self.assertEqual(response.status_code, 500)
-        self.assertIn("RuntimeError", response.json()["detail"])
+        self.assertIn("internal error", response.json()["detail"].lower())
 
     def test_empty_question_returns_422(self):
         response = self.client.post("/api/research", json={"question": " "})

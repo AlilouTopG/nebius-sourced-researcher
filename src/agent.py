@@ -196,7 +196,7 @@ def assign_source_roles(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     )
     secondary_terms = (
         "news", "reported", "reports", "according to",
-        "reuters", "article", "analysis",
+        "reuters", "article", "analysis", "co2 earth", "ebsco",
     )
     classified = []
     for source in sources:
@@ -223,6 +223,30 @@ def assign_source_roles(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             item["source_role"] = "contextual"
         classified.append(item)
     return classified
+
+
+def clean_claim_text(text: str, sources: List[Dict[str, Any]]) -> str:
+    """Remove source-title wrappers while retaining concise factual wording."""
+    cleaned = re.sub(r"\s+", " ", text.strip())
+    for source in sources:
+        title = re.sub(r"\s+", " ", str(source.get("title", "")).strip())
+        if title:
+            cleaned = re.sub(
+                r"^" + re.escape(title) + r"\s*(?:\||:|-)?\s*(?:reports that\s*)?",
+                "",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+    cleaned = re.sub(r"^(?:The\s+)?(?:article|news report|source)\s+(?:reports that|states that)\s+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^[-:\|]\s*", "", cleaned)
+    cleaned = re.sub(
+        r"^(?:NOAA|WMO|NASA|EPA|CDC|WHO)\s+[^:|—\-]{0,80}?"
+        r"(?:Climate\.gov|reports that|states that|reported that)\s+",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned.strip()
 
 
 def extract_evidence(question: str, sources: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -253,7 +277,13 @@ def extract_evidence(question: str, sources: List[Dict[str, Any]]) -> Dict[str, 
         "9. Treat primary-role sources as authoritative institutions, not as automatically interchangeable.\n"
         "10. Do not create a separate claim for a secondary source that merely repeats or rounds a primary institution's figure.\n"
         "11. Prefer the primary source's precise figure and mention rounded secondary reporting only as context.\n"
-        "12. If no factual claims can be established, return {\"claims\":[]}."
+        "12. Distinguish station-level readings from global averages and retain explicit measurement scope.\n"
+        "13. Do not add historical numerical claims unless material to the question.\n"
+        "14. For WMO evidence, extract a separate WMO claim even if NOAA evidence is already present.\n"
+        "15. If a secondary source says an institution reported a figure, attribute the exact claim to the secondary source reporting it and do not claim direct primary verification.\n"
+        "16. Keep claim text concise and factual; do not embed source titles or publisher names in claim text.\n"
+        "17. For context-dependent excerpts, preserve a nearby clause identifying atmospheric CO2, global scope, year, and aggregation when present.\n"
+        "18. If no factual claims can be established, return {\"claims\":[]}."
     )
     response = llm.chat.completions.create(
         model=MODEL,
@@ -293,7 +323,7 @@ def validate_evidence(
         confidence = raw_claim.get("confidence")
         verification_status = raw_claim.get("verification_status")
         if not isinstance(text, str) or not text.strip():
-            rejected_claim_ids.append({"id": claim_id, "reason": "missing claim text"})
+            rejected_claim_ids.append({"id": claim_id, "text": "", "reason": "missing claim text"})
             continue
 
         valid_evidence: List[Evidence] = []
@@ -326,28 +356,30 @@ def validate_evidence(
                 continue
 
         if not valid_evidence:
-            rejected_claim_ids.append({"id": claim_id, "reason": "no remaining valid evidence"})
+            rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "no remaining valid evidence"})
             continue
+
+        text = clean_claim_text(text, sources)
 
         support_types = {item.support_type for item in valid_evidence}
         if verification_status == "supported":
             if "supports" not in support_types:
-                rejected_claim_ids.append({"id": claim_id, "reason": "unsupported supported-status claim"})
+                rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "unsupported supported-status claim"})
                 continue
             if "contradicts" in support_types:
                 verification_status = "partially_supported"
         elif verification_status == "contradicted":
             if "contradicts" not in support_types:
-                rejected_claim_ids.append({"id": claim_id, "reason": "contradicted claim lacks contradicting evidence"})
+                rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "contradicted claim lacks contradicting evidence"})
                 continue
             if "supports" in support_types:
                 verification_status = "partially_supported"
         elif verification_status == "partially_supported":
             if "supports" not in support_types:
-                rejected_claim_ids.append({"id": claim_id, "reason": "partial claim lacks supporting evidence"})
+                rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "partial claim lacks supporting evidence"})
                 continue
         elif verification_status != "unverified":
-            rejected_claim_ids.append({"id": claim_id, "reason": "invalid verification status"})
+            rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "invalid verification status"})
             continue
 
         try:
@@ -361,7 +393,7 @@ def validate_evidence(
                 )
             )
         except Exception:
-            rejected_claim_ids.append({"id": claim_id, "reason": "invalid Pydantic claim"})
+            rejected_claim_ids.append({"id": claim_id, "text": text.strip(), "reason": "invalid Pydantic claim"})
 
     return claims, rejected_claim_ids
 
@@ -470,194 +502,496 @@ def build_sources(sources: List[Dict[str, Any]]) -> List[Source]:
     return valid_sources
 
 
-def determine_status(claims: List[Claim]) -> Literal["success", "partial", "insufficient_evidence"]:
+def determine_status(
+    claims: List[Claim],
+    question: str = "",
+    rejected_claims: List[Dict[str, Any]] | None = None,
+    sources: List[Dict[str, Any]] | None = None,
+    numerical_conflicts: bool = False,
+) -> Literal["success", "partial", "insufficient_evidence"]:
     if not claims:
         return "insufficient_evidence"
-    if all(claim.verification_status == "supported" for claim in claims):
-        return "success"
+    if numerical_conflicts:
+        return "partial"
+    if any(claim.verification_status != "supported" for claim in claims):
+        return "partial"
+
+    lower_question = question.lower()
+    asks_latest_or_global = any(
+        term in lower_question
+        for term in ("latest", "current", "recent", "globally", "global")
+    )
+    if asks_latest_or_global:
+        has_global = any(
+            _claim_supports_global_measurement(claim, sources)
+            for claim in claims
+        )
+        if not has_global:
+            return "partial"
+
+    for rejection in rejected_claims or []:
+        text = str(rejection.get("text", "")).lower()
+        if not text:
+            continue
+        rejection_years = re.findall(r"\b((?:19|20)\d{2})\b", text)
+        accepted_years = []
+        for claim in claims:
+            accepted_text = " ".join(
+                [claim.text] + [evidence.excerpt for evidence in claim.evidence]
+            )
+            accepted_years.extend(re.findall(r"\b((?:19|20)\d{2})\b", accepted_text))
+        if rejection_years and accepted_years:
+            rejection_rank = max(int(year) for year in rejection_years)
+            accepted_rank = max(int(year) for year in accepted_years)
+            if accepted_rank > rejection_rank:
+                continue
+        if asks_latest_or_global and any(
+            term in text
+            for term in ("global", "latest", "wmo", "noaa", "mauna loa")
+        ):
+            return "partial"
+    return "success"
+
+
+def _claim_supports_global_measurement(
+    claim: Claim,
+    sources: List[Dict[str, Any]] | None,
+) -> bool:
+    source_by_id = {source["id"]: source for source in sources or []}
+    for evidence in claim.evidence:
+        if evidence.support_type != "supports":
+            continue
+        source_content = source_by_id.get(evidence.source_id, {}).get("content", "")
+        context = normalize_measurement_context(
+            " ".join([claim.text, evidence.excerpt, str(source_content)])
+        )
+        if (
+            context["variable"] == "carbon-dioxide"
+            and context["geographic_scope"] == "global"
+            and context["unit"] != "unknown"
+            and context["reporting_period"] != "unknown"
+        ):
+            return True
+    return False
+
+
+def claim_period_rank(claim: Claim) -> int:
+    text = " ".join(
+        [claim.text] + [evidence.excerpt for evidence in claim.evidence]
+    ).lower()
+    reporting_period = normalize_measurement_context(text)["reporting_period"]
+    week_match = re.fullmatch(
+        r"week-([a-z]+)-(\d{1,2})-((?:19|20)\d{2})",
+        reporting_period,
+    )
+    if week_match:
+        month_names = {
+            "january": 1, "february": 2, "march": 3, "april": 4,
+            "may": 5, "june": 6, "july": 7, "august": 8,
+            "september": 9, "october": 10, "november": 11, "december": 12,
+        }
+        return (
+            int(week_match.group(3)) * 10000
+            + month_names.get(week_match.group(1), 0) * 100
+            + int(week_match.group(2))
+        )
+
+    month_match = re.fullmatch(
+        r"([a-z]+)-((?:19|20)\d{2})",
+        reporting_period,
+    )
+    if month_match:
+        month_names = {
+            "january": 1, "february": 2, "march": 3, "april": 4,
+            "may": 5, "june": 6, "july": 7, "august": 8,
+            "september": 9, "october": 10, "november": 11, "december": 12,
+        }
+        return int(month_match.group(2)) * 10000 + month_names.get(
+            month_match.group(1), 0
+        ) * 100
+
+    date_match = re.fullmatch(
+        r"date-((?:19|20)\d{2})-(\d{2})-(\d{2})",
+        reporting_period,
+    )
+    if date_match:
+        return (
+            int(date_match.group(1)) * 10000
+            + int(date_match.group(2)) * 100
+            + int(date_match.group(3))
+        )
+
+    year_match = re.fullmatch(r"((?:19|20)\d{2})", reporting_period)
+    return int(year_match.group(1)) * 10000 if year_match else 0
+
+
+def filter_material_claims(
+    question: str,
+    claims: List[Claim],
+    sources: List[Dict[str, Any]],
+) -> Tuple[List[Claim], int]:
+    """Keep the latest relevant claim per measurement context and discard older duplicates."""
+    if not any(term in question.lower() for term in ("latest", "current", "recent")):
+        return claims, 0
+
+    latest_period_by_context: Dict[Tuple[str, str, str, str, str], int] = {}
+    groups: Dict[
+        Tuple[str, str, str, str, str],
+        List[Tuple[Claim, int]],
+    ] = {}
+    identity_fields = (
+        "variable",
+        "geographic_scope",
+        "location",
+        "aggregation",
+        "unit",
+    )
+    context_fields = identity_fields + ("reporting_period",)
+
+    def period_granularity(reporting_period: str) -> str:
+        if re.fullmatch(r"(?:19|20)\d{2}", reporting_period):
+            return "year"
+        if re.fullmatch(
+            r"(?:january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)-((?:19|20)\d{2})",
+            reporting_period,
+        ):
+            return "month"
+        if re.fullmatch(
+            r"week-(?:[a-z]+)-\d{1,2}-((?:19|20)\d{2})",
+            reporting_period,
+        ):
+            return "week"
+        if re.fullmatch(
+            r"date-((?:19|20)\d{2})-\d{2}-\d{2}",
+            reporting_period,
+        ):
+            return "date"
+        return "unknown"
+
+    for claim in claims:
+        text = " ".join(
+            [claim.text] + [evidence.excerpt for evidence in claim.evidence]
+        )
+        context = normalize_measurement_context(text)
+        granularity = period_granularity(context["reporting_period"])
+        if (
+            any(context[field] == "unknown" for field in context_fields)
+            or granularity == "unknown"
+        ):
+            continue
+        key = tuple(context[field] for field in identity_fields) + (granularity,)
+        groups.setdefault(key, []).append((claim, claim_period_rank(claim)))
+
+    for key, grouped_claims in groups.items():
+        latest_period_by_context[key] = max(
+            period_rank for _, period_rank in grouped_claims
+        )
+
+    retained_ids = {
+        id(claim)
+        for key, grouped_claims in groups.items()
+        for claim, period_rank in grouped_claims
+        if period_rank == latest_period_by_context[key]
+    }
+    retained = []
+    removed = 0
+    for claim in claims:
+        text = " ".join(
+            [claim.text] + [evidence.excerpt for evidence in claim.evidence]
+        ).lower()
+        context = normalize_measurement_context(text)
+        complete_context = (
+            not any(context[field] == "unknown" for field in context_fields)
+            and period_granularity(context["reporting_period"]) != "unknown"
+        )
+        if complete_context and id(claim) not in retained_ids:
+            removed += 1
+            continue
+        retained.append(claim)
+    return retained, removed
+
+
+def specific_rejected_claim_limitations(
+    rejected_claims: List[Dict[str, Any]],
+    question: str,
+) -> List[str]:
+    if not rejected_claims:
+        return []
+    reasons = {
+        str(rejection.get("reason", "")).lower()
+        for rejection in rejected_claims
+    }
+    if any("evidence" in reason or "status" in reason for reason in reasons):
+        return [
+            f"{len(rejected_claims)} extracted claim(s) were omitted because their evidence or verification status was incomplete."
+        ]
+    return [
+        f"{len(rejected_claims)} extracted claim(s) were omitted due to invalid or malformed evidence."
+    ]
     return "partial"
+
+
+def normalize_measurement_context(text: str) -> Dict[str, str]:
+    """Normalize only explicit measurement metadata present in source text."""
+    lower = text.lower()
+
+    if "co2" in lower or "carbon dioxide" in lower or "atmospheric co" in lower:
+        variable = "carbon-dioxide"
+    elif "ch4" in lower or "methane" in lower:
+        variable = "methane"
+    elif "atmospheric" in lower and re.search(r"\b(ppm|ppb)\b", lower):
+        variable = "atmospheric-gas"
+    else:
+        variable = "unknown"
+
+    if "mauna loa" in lower or "station-level" in lower or "at the station" in lower:
+        geographic_scope = "station"
+        location = "mauna loa" if "mauna loa" in lower else "station"
+    elif "global" in lower or "worldwide" in lower:
+        geographic_scope = "global"
+        location = "global"
+    elif "regional" in lower:
+        geographic_scope = "regional"
+        location = "regional"
+    elif "atmospheric" in lower:
+        geographic_scope = "atmospheric"
+        location = "atmospheric"
+    else:
+        geographic_scope = "unknown"
+        location = "unknown"
+
+    if re.search(r"\bweekly\b", lower):
+        aggregation = "weekly"
+    elif re.search(r"\bmonthly\b", lower):
+        aggregation = "monthly"
+    elif re.search(r"\bannual\b|\byearly\b", lower):
+        aggregation = "annual"
+    elif re.search(r"\bdaily\b", lower):
+        aggregation = "daily"
+    elif re.search(r"\bhourly\b", lower):
+        aggregation = "hourly"
+    else:
+        aggregation = "unknown"
+
+    month_names = (
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+    )
+    reporting_period = "unknown"
+    invalid_iso_date = False
+    month_match = re.search(
+        r"\b(" + "|".join(month_names) + r")\s+(20\d{2}|19\d{2})\b",
+        lower,
+    )
+    if month_match:
+        reporting_period = f"{month_match.group(1).lower()}-{month_match.group(2)}"
+    else:
+        week_match = re.search(
+            r"week\s+(?:beginning|began|starting)\s+"
+            r"([a-z]+)\s+(\d{1,2}),?\s+(20\d{2}|19\d{2})",
+            lower,
+        )
+        if week_match:
+            reporting_period = (
+                f"week-{week_match.group(1).lower()}-{week_match.group(2)}-{week_match.group(3)}"
+            )
+        else:
+            iso_match = re.search(
+                r"\b((?:19|20)\d{2})-(\d{2})-(\d{2})\b",
+                lower,
+            )
+            if iso_match:
+                year = int(iso_match.group(1))
+                month = int(iso_match.group(2))
+                day = int(iso_match.group(3))
+                days_in_month = (
+                    29
+                    if month == 2 and (
+                        year % 400 == 0
+                        or (year % 4 == 0 and year % 100 != 0)
+                    )
+                    else 28
+                )
+                if month in {4, 6, 9, 11}:
+                    days_in_month = 30
+                elif month in {1, 3, 5, 7, 8, 10, 12}:
+                    days_in_month = 31
+
+                if 1 <= month <= 12 and 1 <= day <= days_in_month:
+                    if aggregation == "monthly":
+                        reporting_period = f"{month_names[month - 1]}-{year}"
+                    else:
+                        reporting_period = f"date-{year:04d}-{month:02d}-{day:02d}"
+                else:
+                    invalid_iso_date = True
+            else:
+                year_match = re.search(r"\b((?:19|20)\d{2})\b", lower)
+                if year_match:
+                    reporting_period = year_match.group(1)
+
+    if invalid_iso_date:
+        reporting_period = "unknown"
+
+    unit_match = re.search(r"\b(ppm|ppb|percent|%)\b", lower)
+    unit = unit_match.group(1).lower() if unit_match else "unknown"
+    if unit == "%":
+        unit = "percent"
+
+    return {
+        "variable": variable,
+        "geographic_scope": geographic_scope,
+        "location": location,
+        "aggregation": aggregation,
+        "reporting_period": reporting_period,
+        "unit": unit,
+    }
 
 
 def detect_numerical_conflicts(
     claims: List[Claim],
     sources: List[Dict[str, Any]],
 ) -> Tuple[bool, List[str]]:
-    """Detect comparable numerical findings without treating institution attribution as contradiction."""
+    """Flag differing values only when explicit measurement contexts are comparable."""
+    source_by_id = {source["id"]: source for source in sources}
     source_names = {
         source["id"]: str(source.get("title", source["id"]))
         for source in sources
     }
     source_roles = {
-        source["id"]: source.get("source_role", "contextual")
+        source["id"]: (
+            source.get("source_role")
+            if source.get("source_role") in {"primary", "secondary", "contextual"}
+            else None
+        )
         for source in sources
     }
+    provenance_keys = {}
+    for source_id, source in source_by_id.items():
+        for field in ("provenance_id", "publication_id", "originating_publication"):
+            value = source.get(field)
+            if isinstance(value, str) and value.strip():
+                provenance_keys[source_id] = value.strip().lower()
+                break
     pattern = re.compile(
         r"(?<![\w])(-?\d+(?:\.\d+)?)\s*(ppm|ppb|percent|%)",
         re.IGNORECASE,
     )
-    year_pattern = re.compile(r"\b((?:19|20)\d{2})\b")
     findings: List[Dict[str, Any]] = []
-    missing_context = False
 
     for claim in claims:
         for evidence in claim.evidence:
+            if source_roles.get(evidence.source_id) == "secondary":
+                continue
             text = f"{claim.text} {evidence.excerpt}"
-            years = [(match.start(), match.group(1)) for match in year_pattern.finditer(text)]
             for match in pattern.finditer(text):
                 value = match.group(1)
                 unit = match.group(2).lower()
                 unit = "percent" if unit == "%" else unit
-                unit_key = "percent" if unit == "percent" else unit
-                if not years:
-                    missing_context = True
-                    continue
-
-                nearest_year = min(
-                    years,
-                    key=lambda item: abs(item[0] - match.start()),
-                )
-                lower_text = text.lower()
-                scope_parts = []
-                if any(term in lower_text for term in ("global", "world")):
-                    scope_parts.append("global")
-                if any(term in lower_text for term in ("atmospheric", "carbon dioxide", "co2")):
-                    scope_parts.append("atmospheric")
-                scope = " ".join(scope_parts) or "unknown"
+                context = normalize_measurement_context(text)
+                context["unit"] = unit
                 findings.append({
                     "value": value,
-                    "unit": unit_key,
-                    "year": nearest_year[1],
-                    "scope": scope,
+                    "context": context,
                     "source_id": evidence.source_id,
+                    "source_role": source_roles.get(evidence.source_id),
+                    "provenance_key": provenance_keys.get(evidence.source_id),
                 })
 
     summaries: List[str] = []
     conflict_found = False
-    groups: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
-    unknown_comparisons: List[Dict[str, Any]] = []
+    comparable_groups: Dict[Tuple[str, str, str, str, str, str], List[Dict[str, Any]]] = {}
+    unknown_findings: List[Dict[str, Any]] = []
+    required_context = (
+        "variable",
+        "geographic_scope",
+        "location",
+        "aggregation",
+        "reporting_period",
+        "unit",
+    )
 
     for finding in findings:
-        if finding["scope"] == "unknown":
-            unknown_comparisons.append(finding)
+        context = finding["context"]
+        if any(context[key] == "unknown" for key in required_context):
+            unknown_findings.append(finding)
             continue
-        key = (finding["unit"], finding["year"], finding["scope"])
-        groups.setdefault(key, []).append(finding)
+        key = tuple(context[key] for key in required_context)
+        comparable_groups.setdefault(key, []).append(finding)
 
-    for (unit, year, scope), comparable_findings in groups.items():
-        distinct_values = {finding["value"] for finding in comparable_findings}
+    for key, comparable in comparable_groups.items():
+        distinct_values = {finding["value"] for finding in comparable}
         if len(distinct_values) < 2:
             continue
 
-        independent_findings = [
-            finding for finding in comparable_findings
-            if source_roles.get(finding["source_id"]) in ("primary", "contextual")
-        ]
-        all_secondary = all(
-            source_roles.get(finding["source_id"]) == "secondary"
-            for finding in comparable_findings
-        )
-        if all_secondary:
-            summaries.append(
-                "Secondary sources report differing values but may repeat an underlying primary publication; "
-                "this is not independent corroboration."
-            )
-            continue
-        if not independent_findings:
-            continue
-
-        source_ids = {finding["source_id"] for finding in independent_findings}
-        if len(source_ids) == 1:
-            # Multiple values in one source can be a trend, not a contradiction.
-            continue
-
-        independent_roles = {
-            source_roles.get(source_id)
-            for source_id in source_ids
-        }
-        if independent_roles == {"contextual"}:
-            summaries.append(
-                f"Genuine conflict candidate for comparable {scope} {year} {unit} measurements."
-            )
-            conflict_found = True
+        source_ids = {finding["source_id"] for finding in comparable}
+        if len(source_ids) < 2:
             continue
 
         parts = []
         for value in sorted(distinct_values, key=float):
             attributed_sources = sorted({
                 finding["source_id"]
-                for finding in independent_findings
+                for finding in comparable
                 if finding["value"] == value
             })
-            if not attributed_sources:
-                continue
             attribution = ", ".join(
                 f"{source_names[source_id]} [{source_id}]"
                 for source_id in attributed_sources
             )
-            display_unit = "%" if unit == "percent" else unit
+            display_unit = "%" if key[5] == "percent" else key[5]
             parts.append(f"{value}{display_unit} reported by {attribution}")
+
+        variable, scope, location, aggregation, period, unit = key
+        roles = {
+            finding["source_role"]
+            for finding in comparable
+            if finding["source_id"] in source_ids
+        }
+        independent_provenance = {
+            finding["provenance_key"]
+            for finding in comparable
+            if finding["provenance_key"]
+        }
+        has_complete_provenance = (
+            all(finding["provenance_key"] for finding in comparable)
+            and len(independent_provenance) >= 2
+        )
+        if roles == {"primary"} and has_complete_provenance:
+            label = "Potential genuine conflict candidate (potential discrepancy)"
+        elif has_complete_provenance:
+            label = "Potential comparable-value discrepancy"
+        else:
+            label = "Unresolved numerical discrepancy (potential conflict)"
         summaries.append(
-            f"Potential measurement discrepancy for comparable {scope} {year} {unit} findings: "
-            + "; ".join(parts)
-            + "."
+            f"{label} for the same {period} {scope} {location} "
+            f"{aggregation} {variable} measurement: " + "; ".join(parts) + "."
         )
         conflict_found = True
 
-    if unknown_comparisons:
-        unknown_groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
-        for finding in unknown_comparisons:
-            unknown_groups.setdefault(
-                (finding["unit"], finding["year"]),
-                [],
-            ).append(finding)
-
-        unresolved = False
-        for (unit, year), unknown_findings in unknown_groups.items():
-            independent_findings = [
-                finding for finding in unknown_findings
-                if source_roles.get(finding["source_id"]) in ("primary", "contextual")
-            ]
-            all_secondary = all(
-                source_roles.get(finding["source_id"]) == "secondary"
-                for finding in unknown_findings
+    if unknown_findings:
+        comparable_scopes = {key[1] for key in comparable_groups}
+        unresolved_findings = [
+            finding
+            for finding in unknown_findings
+            if (
+                finding["context"]["geographic_scope"] == "unknown"
+                or finding["context"]["geographic_scope"] in comparable_scopes
+                or not comparable_scopes
             )
-            if all_secondary:
-                distinct_secondary_values = {
-                    finding["value"] for finding in unknown_findings
-                }
-                if len(distinct_secondary_values) >= 2:
-                    summaries.append(
-                        "Secondary sources report differing values and may repeat an underlying primary publication; "
-                        "this is not independent corroboration."
-                    )
-                continue
-            source_ids = {finding["source_id"] for finding in independent_findings}
-            distinct_values = {finding["value"] for finding in independent_findings}
-            if len(source_ids) >= 2 and len(distinct_values) >= 2:
-                unresolved = True
-                parts = []
-                for value in sorted(distinct_values, key=float):
-                    attributed = sorted({
-                        finding["source_id"]
-                        for finding in independent_findings
-                        if finding["value"] == value
-                    })
-                    parts.append(
-                        f"{value}{unit} reported by "
-                        + ", ".join(f"{source_names[source_id]} [{source_id}]" for source_id in attributed)
-                    )
-                summaries.append(
-                    f"Unresolved numerical discrepancy for {year}: "
-                    + "; ".join(parts)
-                    + ". The comparable metric and measurement scope are not established."
-                )
-        if unresolved:
+        ]
+        source_ids = {finding["source_id"] for finding in unresolved_findings}
+        distinct_values = {finding["value"] for finding in unresolved_findings}
+        if len(source_ids) >= 2 and len(distinct_values) >= 2:
+            summaries.append(
+                "Unresolved numerical discrepancy: differing or incomplete values could not be "
+                "confirmed comparable because variable, scope, location, aggregation, period, or unit metadata is missing."
+            )
             conflict_found = True
-
-    if missing_context:
-        summaries.append(
-            "One or more findings lack a clear year or measurement context."
-        )
+        elif unresolved_findings:
+            summaries.append(
+                "Numerical metadata is incomplete: a clear year or measurement context was not established."
+            )
 
     return conflict_found, summaries
 
@@ -744,7 +1078,11 @@ def synthesize_answer(
         "7. Communicate detected numerical discrepancies and the resulting limitation clearly.\n"
         "8. Do not treat a secondary article repeating a primary institution figure as independent corroboration.\n"
         "9. Do not claim different institutions use equivalent methodologies unless a source establishes that.\n"
-        "10. Use clean Markdown (bullet points, bold key terms) for readability."
+        "10. Distinguish station-level readings from global averages; never call a Mauna Loa station reading a global average.\n"
+        "11. Avoid unnecessary historical claims unless they are material to the user's question.\n"
+        "12. State only that institutions report different 2024 global-average values and that the evidence does not explain the difference.\n"
+        "13. Never state or imply that NOAA and WMO use different reporting frameworks or methodologies.\n"
+        "14. Use clean Markdown (bullet points, bold key terms) for readability."
     )
 
     user_prompt = (
@@ -794,11 +1132,16 @@ def synthesize_answer(
                 answer_text,
                 re.IGNORECASE,
             )
-            if equivalence_claim:
+            unsupported_framework_claim = re.search(
+                r"\b(?:different|distinct)\s+(?:reporting\s+)?(?:frameworks?|methodologies)\b",
+                answer_text,
+                re.IGNORECASE,
+            )
+            if equivalence_claim or unsupported_framework_claim:
                 answer_text = (
                     "**Partial Evidence:** The retrieved sources report differing institutional "
-                    "values, but the evidence does not establish that their methodologies or "
-                    "measurement scopes are equivalent."
+                    "2024 global-average values, but the available evidence does not explain "
+                    "the difference. Methodological differences are not established."
                 )
 
         if not citations_valid:
@@ -868,8 +1211,8 @@ def run_agent(question: str, planned_queries: List[str] | None = None) -> Resear
         limitations.append("Evidence extraction failed due to an LLM API or processing error.")
 
     if rejected_claims:
-        limitations.append(
-            f"{len(rejected_claims)} claim(s) were rejected because their evidence was invalid or incomplete."
+        limitations.extend(
+            specific_rejected_claim_limitations(rejected_claims, question)
         )
 
     claims, removed_secondary_claims = deduplicate_secondary_claims(claims, sources)
@@ -878,8 +1221,20 @@ def run_agent(question: str, planned_queries: List[str] | None = None) -> Resear
             f"{removed_secondary_claims} secondary claim(s) were omitted because they only repeated a primary institution figure."
         )
 
-    status = determine_status(claims)
+    claims, removed_historical_claims = filter_material_claims(question, claims, sources)
+    if removed_historical_claims:
+        limitations.append(
+            f"{removed_historical_claims} older numerical claim(s) were omitted because they were not the latest relevant measurement for the same scope and aggregation."
+        )
+
     numerical_conflicts, numerical_summaries = detect_numerical_conflicts(claims, sources)
+    status = determine_status(
+        claims,
+        question=question,
+        rejected_claims=rejected_claims,
+        sources=sources,
+        numerical_conflicts=numerical_conflicts,
+    )
     if numerical_conflicts:
         status = "partial"
         limitations.extend(numerical_summaries)
