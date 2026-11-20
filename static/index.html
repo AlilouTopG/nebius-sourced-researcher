@@ -98,10 +98,10 @@
         <div class="text-[11px] text-slate-500 leading-tight">Nebius × Tavily</div>
       </div>
     </button>
-    <form id="compactForm" class="flex-1 flex items-center gap-2 min-w-0">
+    <form id="compactForm" novalidate class="flex-1 flex items-center gap-2 min-w-0">
       <div class="relative flex-1 min-w-0">
         <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
-        <input id="compactInput" type="text" minlength="5" required placeholder="Ask a follow-up or new question…"
+        <input id="compactInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask a follow-up or new question…"
           class="w-full bg-slate-900/70 border border-slate-800/80 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500/70 transition" />
       </div>
       <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold px-4 py-2 rounded-xl transition cursor-pointer shrink-0">Research</button>
@@ -112,6 +112,7 @@
     </div>
     <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border shrink-0"></div>
   </div>
+<div id="modeBanner" class="hidden" role="alert"></div>
 </header>
 
 <main class="flex-1 max-w-6xl w-full mx-auto px-4">
@@ -124,9 +125,9 @@
     </div>
     <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-slate-50">What do you want to verify?</h1>
     <p class="mt-3 text-slate-400 max-w-xl mx-auto">Ask a question and get a cited answer, with each claim marked supported, contradicted or unverified.</p>
-    <form id="heroForm" class="mt-8 max-w-2xl mx-auto glass rounded-2xl p-2 flex items-center gap-2 shadow-2xl shadow-sky-950/30 focus-within:border-sky-500/60 transition">
+    <form id="heroForm" novalidate class="mt-8 max-w-2xl mx-auto glass rounded-2xl p-2 flex items-center gap-2 shadow-2xl shadow-sky-950/30 focus-within:border-sky-500/60 transition">
       <i data-lucide="search" class="w-5 h-5 text-slate-500 ml-3 shrink-0"></i>
-      <input id="heroInput" type="text" minlength="5" required placeholder="Ask a research question that needs verifiable sources…"
+      <input id="heroInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask a research question that needs verifiable sources…"
         class="flex-1 min-w-0 bg-transparent px-1 py-3 text-slate-100 placeholder-slate-500 focus:outline-none" />
       <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0 flex items-center gap-2">
         Research <i data-lucide="arrow-right" class="w-4 h-4"></i>
@@ -134,6 +135,11 @@
     </form>
     <div class="mt-5 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-2 text-left" id="presets"></div>
   </section>
+
+  <!-- Validation notice -->
+  <div id="validationNotice" role="alert" class="hidden mt-4 max-w-2xl mx-auto px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm flex items-center gap-2.5 fade-in">
+    <i data-lucide="info" class="w-4 h-4 shrink-0"></i><span id="validationText"></span>
+  </div>
 
   <!-- Error -->
   <div id="errorBox" class="hidden mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-sm flex gap-3 items-start fade-in">
@@ -153,10 +159,11 @@
   <!-- Results -->
   <div id="resultsContainer" class="hidden py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6 min-w-0">
+      <div id="statusBanner" class="hidden rounded-2xl border p-4 fade-in" role="status"></div>
       <div id="answerCard" class="glass rounded-2xl p-6 sm:p-8 fade-in">
         <p id="questionEcho" class="text-xl sm:text-2xl font-semibold tracking-tight text-slate-50 mb-5"></p>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <div class="flex items-center gap-2 text-sm font-medium text-sky-400"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-500 font-normal"></span></div>
+          <div class="flex items-center gap-2 text-sm font-medium text-sky-400"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-500 font-normal"></span><span id="mockChip" class="hidden ml-2 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded border border-amber-500/50 bg-amber-500/15 text-amber-300">DEMO DATA</span></div>
           <div class="flex items-center gap-2">
             <button id="copyMdBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Markdown report</span></button>
             <button id="jsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="braces" class="w-3.5 h-3.5"></i>View raw JSON</button>
@@ -181,6 +188,7 @@
     <aside class="min-w-0">
       <div class="lg:sticky lg:top-20 space-y-3">
         <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="library" class="w-4 h-4 text-slate-400"></i> Sources <span class="text-slate-500 font-normal">(<span id="sourceCount">0</span>)</span></h2>
+        <p id="sourceMix" class="text-[11px] text-slate-500 -mt-1"></p>
         <div id="sourcesList" class="space-y-3 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1"></div>
       </div>
     </aside>
@@ -236,7 +244,7 @@
   });
 
   /* ---------- state ---------- */
-  let lastData = null, lastSources = [], timerId = null, stageTimeouts = [];
+  let lastData = null, lastSources = [], timerId = null, stageTimeouts = [], healthMode = null, isLoading = false;
   const STAGES = [
     { t: 0,     label: 'Planning search queries…' },
     { t: 3500,  label: 'Querying Tavily web index…' },
@@ -269,12 +277,32 @@
   }
 
   /* ---------- research flow ---------- */
+  function showNotice(msg) {
+    $('validationText').textContent = msg;
+    $('validationNotice').classList.remove('hidden');
+    icons();
+    if (document.body.classList.contains('results')) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function clearNotice() { $('validationNotice').classList.add('hidden'); }
+  ['heroInput', 'compactInput'].forEach(id => $(id).addEventListener('input', clearNotice));
+
+  function setBusy(on) {
+    isLoading = on;
+    document.querySelectorAll('.compactBtn').forEach(b => { b.disabled = on; b.classList.toggle('opacity-50', on); b.classList.toggle('cursor-not-allowed', on); });
+    document.querySelectorAll('#presets button').forEach(b => { b.disabled = on; b.classList.toggle('opacity-50', on); b.classList.toggle('pointer-events-none', on); });
+    ['heroInput', 'compactInput'].forEach(id => { $(id).readOnly = on; });
+    $('homeBtn').disabled = on;
+  }
+
   async function runResearch(question) {
+    if (isLoading) return;  // ignore duplicate submissions while a request is in flight
     question = (question || '').trim();
-    if (question.length < 5) return;
+    if (!question) { showNotice('Enter a research question to get started.'); return; }
+    if (question.length < 5) { showNotice('Questions need at least 5 characters. Add a little more detail.'); return; }
+    clearNotice();
     $('heroInput').value = question; $('compactInput').value = question;
 
-    document.querySelectorAll('.compactBtn').forEach(b => { b.disabled = true; b.classList.add('opacity-50'); });
+    setBusy(true);
     $('errorBox').classList.add('hidden');
     $('resultsContainer').classList.add('hidden');
     setMode(true);
@@ -294,7 +322,7 @@
       $('errorBox').classList.remove('hidden');
     } finally {
       stopLoading();
-      document.querySelectorAll('.compactBtn').forEach(b => { b.disabled = false; b.classList.remove('opacity-50'); });
+      setBusy(false);
       icons();
     }
   }
@@ -304,7 +332,8 @@
     runResearch(e.target.querySelector('input').value);
   }));
   $('homeBtn').addEventListener('click', () => {
-    setMode(false); $('resultsContainer').classList.add('hidden'); $('errorBox').classList.add('hidden');
+    if (isLoading) return;
+    clearNotice(); setMode(false); $('resultsContainer').classList.add('hidden'); $('errorBox').classList.add('hidden');
     $('statusPill').classList.add('hidden'); $('heroInput').value = ''; window.scrollTo({ top: 0 });
   });
 
@@ -361,14 +390,14 @@
     const t = token.trim();
     const byId = sources.findIndex(s => String(s.id).toLowerCase() === t.toLowerCase());
     if (byId >= 0) return byId + 1;
-    const m = t.match(/^S?(\d+)$/i);
+    const m = t.match(/^(?:S|source_)?(\d+)$/i);
     const n = m ? parseInt(m[1], 10) : 0;
     return n >= 1 && n <= sources.length ? n : 0;
   }
 
   // Turns [1], [S1] and [S1, S2] in text nodes into clickable badges (skips links and code).
   function linkCitations(root, sources) {
-    const re = /\[\s*(S?\d+(?:\s*[,;]\s*S?\d+)*)\s*\]/gi;
+    const re = /\[\s*((?:S|source_)?\d+(?:\s*[,;]\s*(?:S|source_)?\d+)*)\s*\]/gi;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: n => n.parentElement && n.parentElement.closest('a,code,pre') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
@@ -394,6 +423,37 @@
       node.replaceWith(frag);
     });
   }
+
+  /* ---------- primary vs secondary sources ---------- */
+  // The ResearchResult.Source schema has no tier/source_type/is_primary field. If the API ever adds one
+  // (is_primary, source_type or tier) it is used as-is; otherwise the label is inferred from the domain.
+  const PRIMARY_HOSTS = ['nature.com', 'science.org', 'thelancet.com', 'nejm.org', 'jamanetwork.com', 'bmj.com', 'plos.org', 'arxiv.org', 'doi.org',
+    'who.int', 'un.org', 'worldbank.org', 'oecd.org', 'imf.org', 'iea.org', 'ipcc.ch', 'heart.org', 'cell.com'];
+  function sourceHost(s) {
+    let h = String(s.domain || '').toLowerCase();
+    if (!h) { try { h = new URL(s.url).hostname.toLowerCase(); } catch { h = ''; } }
+    return h.replace(/^www\./, '');
+  }
+  function classifySource(s) {
+    if (typeof s.is_primary === 'boolean') return { primary: s.is_primary, inferred: false };
+    const t = String(s.source_type ?? s.tier ?? '').toLowerCase();
+    if (t) {
+      if (/secondary|news|media|blog|^[2-9]$|tier[ _-]?[2-9]/.test(t)) return { primary: false, inferred: false };
+      if (/primary|official|original|^1$|tier[ _-]?1/.test(t)) return { primary: true, inferred: false };
+    }
+    const h = sourceHost(s);
+    const primary = /\.(gov|edu|mil|int)$/.test(h) || /(^|\.)(gov|ac|edu)\.[a-z]{2}$/.test(h) || /(^|\.)europa\.eu$/.test(h)
+      || /^docs\./.test(h) || PRIMARY_HOSTS.some(p => h === p || h.endsWith('.' + p));
+    return { primary, inferred: true };
+  }
+  function sourceBadge(s) {
+    const c = classifySource(s);
+    const cls = c.primary ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-slate-700/30 text-amber-300 border-slate-600/70';
+    const tip = c.inferred ? 'Inferred from the source domain; the API does not classify sources.' : 'Classified by the research agent.';
+    return `<span title="${tip}" class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border ${cls}">
+      <i data-lucide="${c.primary ? 'badge-check' : 'newspaper'}" class="w-3 h-3"></i>${c.primary ? 'Primary Source' : 'Secondary Source'}${c.inferred ? '<span class="font-normal opacity-60">· inferred</span>' : ''}</span>`;
+  }
+  const isMockResult = d => healthMode === 'mock' || /^mock_/i.test((d && d.research_id) || '');
 
   /* ---------- claim cards + filter pills ---------- */
   let claimFilter = 'all';
@@ -426,7 +486,7 @@
               ${confBadge(c.confidence)}
             </div>
             <p class="text-[15px] text-slate-50 font-medium leading-relaxed">${escapeHtml(c.text)}</p>
-            ${ev.length ? `<details class="mt-3 group" ${ev.length <= 1 ? 'open' : ''}>
+            ${ev.length ? `<details class="mt-3 group" open>
               <summary class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-sky-300 transition select-none">
                 <i data-lucide="chevron-down" class="chev w-3.5 h-3.5 transition-transform"></i> ${ev.length} evidence quote${ev.length > 1 ? 's' : ''}
               </summary>
@@ -451,10 +511,11 @@
 
     const shown = claimFilter === 'all' ? claims : claims.filter(c => claimKey(c) === claimFilter);
     $('claimsList').innerHTML = claims.length === 0
-      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims were extracted for this answer.</div>`
+      ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">${lastData && lastData.status === 'insufficient_evidence' ? 'No claims were verified because the evidence was insufficient.' : 'No claims were extracted for this answer.'}</div>`
       : shown.length === 0
         ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims match this filter.</div>`
         : shown.map(c => claimCard(c, sources, idx)).join('');
+    linkCitations($('claimsList'), sources);
   }
 
   function renderReport(data) {
@@ -469,6 +530,18 @@
     $('statusPill').textContent = pretty(st);
     $('questionEcho').textContent = data.question || $('compactInput').value;
     $('roundsBadge').textContent = `${data.search_rounds || 1} search round${(data.search_rounds || 1) > 1 ? 's' : ''}`;
+    // status banner (partial / insufficient evidence) + demo-data chip
+    const sb = {
+      partial: ['bg-amber-500/10 border-amber-500/40 text-amber-100', 'triangle-alert', 'Partial evidence', 'Some claims could not be fully verified. Check the claim cards and the limits of the evidence before relying on this answer.'],
+      insufficient_evidence: ['bg-rose-500/10 border-rose-500/40 text-rose-100', 'ban', 'Insufficient evidence', 'The sources found do not support a reliable answer, so nothing below is presented as verified.']
+    }[data.status];
+    const banner = $('statusBanner');
+    if (sb) {
+      banner.className = `rounded-2xl border p-4 fade-in flex items-start gap-3 ${sb[0]}`;
+      banner.innerHTML = `<i data-lucide="${sb[1]}" class="w-5 h-5 mt-0.5 shrink-0"></i><div><div class="font-semibold">${sb[2]}</div><p class="text-sm opacity-90 mt-0.5">${sb[3]}</p></div>`;
+    } else { banner.className = 'hidden'; banner.innerHTML = ''; }
+    $('mockChip').classList.toggle('hidden', !isMockResult(data));
+
     $('metaRow').innerHTML = [
       data.research_id && `<span>id: ${escapeHtml(data.research_id)}</span>`,
       data.generated_at && `<span>${escapeHtml(new Date(data.generated_at).toLocaleString())}</span>`
@@ -483,9 +556,11 @@
     });
     linkCitations(answerEl, sources);
 
-    // limitations
-    const lims = data.limitations || [];
+    // limitations ("Limits of the evidence"); non-success results always show the box
+    let lims = data.limitations || [];
+    if (!lims.length && data.status !== 'success') lims = ['The agent reported no specific limitations. Treat unverified or partially supported claims with caution.'];
     $('limitationsList').innerHTML = lims.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+    linkCitations($('limitationsList'), sources);
     $('limitationsBox').classList.toggle('hidden', !lims.length);
 
     // claims
@@ -493,24 +568,31 @@
     $('claimCount').textContent = (data.claims || []).length;
     renderClaims();
 
-    // sources
+    // sources: badge (primary/secondary) + external link on every card
     $('sourceCount').textContent = sources.length;
+    const nPrimary = sources.filter(s => classifySource(s).primary).length;
+    $('sourceMix').textContent = sources.length ? `${nPrimary} primary · ${sources.length - nPrimary} secondary` : '';
     $('sourcesList').innerHTML = sources.length === 0
       ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No external sources were cited.</div>`
-      : sources.map((s, i) => `
-        <a id="src-${i + 1}" href="${escapeHtml(safeUrl(s.url))}" target="_blank" rel="noopener noreferrer"
-           class="block p-4 rounded-xl glass hover:border-sky-500/50 transition group fade-in">
+      : sources.map((s, i) => {
+          const url = escapeHtml(safeUrl(s.url));
+          const label = escapeHtml(String(s.url).replace(/^https?:\/\//, '').replace(/\/$/, ''));
+          return `
+        <div id="src-${i + 1}" class="scroll-mt-24 p-4 rounded-xl glass hover:border-sky-500/40 transition fade-in">
           <div class="flex items-center justify-between gap-2 mb-2">
             <span class="inline-flex items-center gap-2 min-w-0">
               <span class="citation-badge" style="margin:0">${i + 1}</span>
-              <span class="text-xs text-slate-400 font-mono truncate">${escapeHtml(s.domain)}</span>
+              <span class="text-xs text-slate-300 font-mono truncate">${escapeHtml(s.domain)}</span>
             </span>
             <span class="text-[10px] text-slate-600 font-mono shrink-0">${escapeHtml(s.id)}</span>
           </div>
-          <h3 class="text-sm font-medium text-slate-200 group-hover:text-sky-300 transition line-clamp-2 flex items-start gap-1.5">
-            <span>${escapeHtml(s.title)}</span><i data-lucide="arrow-up-right" class="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-60"></i>
-          </h3>
-        </a>`).join('');
+          <a href="${url}" target="_blank" rel="noopener noreferrer" class="block text-sm font-medium text-slate-100 hover:text-sky-300 transition line-clamp-2">${escapeHtml(s.title)}</a>
+          <div class="mt-2.5">${sourceBadge(s)}</div>
+          <a href="${url}" target="_blank" rel="noopener noreferrer" class="mt-2.5 flex items-center gap-1.5 text-[11px] font-mono text-sky-400/90 hover:text-sky-300 transition min-w-0">
+            <i data-lucide="external-link" class="w-3 h-3 shrink-0"></i><span class="truncate">${label}</span>
+          </a>
+        </div>`;
+        }).join('');
 
     $('resultsContainer').classList.remove('hidden');
     $('jsonPre').textContent = JSON.stringify(data, null, 2);
@@ -537,7 +619,8 @@
   function buildMarkdown(d) {
     const src = d.sources || [];
     const idx = {}; src.forEach((s, i) => { idx[s.id] = i + 1; });
-    let md = `# ${d.question}\n\n**Status:** ${pretty(d.status)} · **Search rounds:** ${d.search_rounds ?? 1}\n\n## Answer\n\n${d.answer || ''}\n`;
+    let md = isMockResult(d) ? `> ⚠️ **Demo data from the mock responder, not live research.**\n\n` : '';
+    md += `# ${d.question}\n\n**Status:** ${pretty(d.status)} · **Search rounds:** ${d.search_rounds ?? 1}\n\n## Answer\n\n${d.answer || ''}\n`;
     if ((d.limitations || []).length) md += `\n## Limitations\n\n${d.limitations.map(l => `- ${l}`).join('\n')}\n`;
     if ((d.claims || []).length) {
       md += `\n## Claim verification\n\n`;
@@ -570,7 +653,21 @@
   $('drawerBackdrop').addEventListener('click', () => toggleDrawer(false));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleDrawer(false); });
 
-  /* ---------- backend health badge ---------- */
+  /* ---------- backend health badge + mode banner ---------- */
+  function applyModeBanner(mode) {
+    if (mode === healthMode) return;
+    healthMode = mode;
+    const cfg = {
+      mock: ['bg-amber-500/15 border-amber-500/50 text-amber-100', 'triangle-alert', 'MOCK MODE', 'Responses are built-in demo data, not live research. Do not treat them as real findings.'],
+      unavailable: ['bg-rose-500/15 border-rose-500/50 text-rose-100', 'octagon-alert', 'AGENT UNAVAILABLE', 'The research agent is not available, so research requests will fail.'],
+      offline: ['bg-rose-500/15 border-rose-500/50 text-rose-100', 'wifi-off', 'API OFFLINE', 'Cannot reach the backend. Check that the server is running.']
+    }[mode];
+    const b = $('modeBanner');
+    if (!cfg) { b.className = 'hidden'; b.innerHTML = ''; return; }
+    b.className = `border-t ${cfg[0]}`;
+    b.innerHTML = `<div class="max-w-6xl mx-auto px-4 py-2 flex items-center gap-2.5 text-sm"><i data-lucide="${cfg[1]}" class="w-4 h-4 shrink-0"></i><span><strong class="font-semibold tracking-wide">${cfg[2]}:</strong> ${cfg[3]}</span></div>`;
+    icons();
+  }
   async function checkHealth() {
     const badge = $('healthBadge'), dot = $('healthDot'), text = $('healthText');
     const set = (tone, label, title) => {
@@ -587,7 +684,8 @@
       if (mode === 'live') set('ok', 'API online · live agent', 'Backend reachable, live agent connected');
       else if (mode === 'mock') set('mock', 'API online · mock mode', 'Backend reachable, serving mock demo data');
       else set('off', 'Agent unavailable', 'Backend reachable, but the research agent is not available');
-    } catch { set('off', 'API offline', 'Cannot reach /api/health'); }
+      applyModeBanner(mode === 'live' || mode === 'mock' ? mode : 'unavailable');
+    } catch { set('off', 'API offline', 'Cannot reach /api/health'); applyModeBanner('offline'); }
   }
   checkHealth(); setInterval(checkHealth, 30000);
 
