@@ -1408,7 +1408,7 @@ def synthesize_answer(
     claims: List[Claim] | None = None,
     numerical_discrepancies: List[str] | None = None,
 ) -> Dict[str, Any]:
-    """Step 4: Generate a strictly grounded answer with [n] inline citations."""
+    """Step 4: Generate a strictly grounded answer with [S1]-style inline citations."""
     if not sources or not claims:
         return {
             "answer": (
@@ -1527,10 +1527,13 @@ def synthesize_answer(
                 "**Insufficient Evidence:**",
             ).strip()
 
-        return {
+        result = {
             "answer": answer_text,
             "insufficient_evidence": is_insufficient,
         }
+        if not citations_valid:
+            result["citation_diagnostics"] = invalid_citations
+        return result
     except Exception:
         return {
             "answer": "**Inference Error:** Failed to synthesize answer via Nebius Token Factory.",
@@ -1641,6 +1644,29 @@ def run_agent(question: str, planned_queries: List[str] | None = None) -> Resear
     elif synthesis["answer"].startswith("**Citation Validation Failed:**"):
         status = "partial"
         limitations.append("The final answer omitted citation-dependent text after invalid citations were detected.")
+    citation_diagnostics = synthesis.get("citation_diagnostics", [])
+    if isinstance(citation_diagnostics, list) and citation_diagnostics:
+        citation_like = re.compile(
+            r"^(?:S\d+|\d+|(?:https?://|www\.)[^\s\[\]]+)$",
+            re.IGNORECASE,
+        )
+        safe_diagnostics = []
+        for token in citation_diagnostics:
+            if len(safe_diagnostics) >= 5:
+                break
+            if not isinstance(token, str) or not token.strip() or len(token) > 40:
+                continue
+            if any(ord(character) < 32 or ord(character) == 127 for character in token):
+                continue
+            normalized_token = token.strip()
+            if citation_like.fullmatch(normalized_token):
+                safe_diagnostics.append(normalized_token)
+        if safe_diagnostics:
+            limitations.append(
+                "Citation validation rejected references: "
+                + ", ".join(safe_diagnostics)
+                + "."
+            )
 
     return ResearchResult(
         research_id=f"research_{uuid.uuid4()}",

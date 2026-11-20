@@ -2378,6 +2378,7 @@ class AgentEvidenceTests(unittest.TestCase):
             "Malformed group [S1, S99].",
             "Malformed numeric group [S1, 2].",
             "Malformed unknown group [S1, UNKNOWN].",
+            "Arbitrary bracketed text [2024].",
         ]
         for answer in invalid_cases:
             valid, invalid = agent.validate_answer_citations(answer, self.sources)
@@ -2427,6 +2428,126 @@ class AgentEvidenceTests(unittest.TestCase):
         valid, invalid = agent.validate_answer_citations(result["answer"], self.sources)
         self.assertTrue(valid)
         self.assertEqual(invalid, [])
+        self.assertEqual(result["citation_diagnostics"], ["1"])
+
+    @patch("src.agent.llm")
+    def test_synthesis_retries_invalid_citation_and_accepts_valid_ids(self, mock_llm):
+        first_response = Mock()
+        first_response.choices = [Mock(message=Mock(content="Bad [S7]"))]
+        second_response = Mock()
+        second_response.choices = [Mock(message=Mock(content="Supported by [S1][S2]."))]
+        mock_llm.chat.completions.create.side_effect = [first_response, second_response]
+
+        result = agent.synthesize_answer(
+            "test question",
+            self.sources,
+            [
+                Claim(
+                    id="claim_1",
+                    text="A validated claim",
+                    confidence="high",
+                    verification_status="supported",
+                    evidence=[],
+                )
+            ],
+        )
+
+        self.assertEqual(result["answer"], "Supported by [S1][S2].")
+        self.assertNotIn("citation_diagnostics", result)
+        self.assertEqual(mock_llm.chat.completions.create.call_count, 2)
+
+    @patch("src.agent.llm")
+    def test_synthesis_preserves_final_invalid_citation_diagnostic(self, mock_llm):
+        first_response = Mock()
+        first_response.choices = [Mock(message=Mock(content="Bad [S7]"))]
+        second_response = Mock()
+        second_response.choices = [Mock(message=Mock(content="Still bad [1]."))]
+        mock_llm.chat.completions.create.side_effect = [first_response, second_response]
+
+        result = agent.synthesize_answer(
+            "test question",
+            self.sources,
+            [
+                Claim(
+                    id="claim_1",
+                    text="A validated claim",
+                    confidence="high",
+                    verification_status="supported",
+                    evidence=[],
+                )
+            ],
+        )
+
+        self.assertEqual(result["citation_diagnostics"], ["1"])
+
+    @patch("src.agent.synthesize_answer")
+    @patch("src.agent.extract_evidence")
+    @patch("src.agent.retrieve_and_dedupe_with_metadata")
+    @patch("src.agent.plan_queries_with_metadata")
+    def test_run_agent_exposes_safe_citation_diagnostic_in_limitations(
+        self,
+        mock_plan,
+        mock_retrieve,
+        mock_extract,
+        mock_synthesize,
+    ):
+        mock_plan.return_value = (["test query"], [])
+        mock_retrieve.return_value = agent.RetrievalDiagnostics(
+            sources=[{
+                "title": "Source",
+                "url": "https://example.com",
+                "domain": "example.com",
+                "content": "A validated source excerpt.",
+                "score": 0.9,
+            }],
+            successful_search_calls=1,
+            limitations=[],
+        )
+        mock_extract.return_value = {
+            "claims": [{
+                "id": "claim_1",
+                "text": "A validated claim",
+                "confidence": "high",
+                "verification_status": "supported",
+                "evidence": [{
+                    "source_id": "S1",
+                    "excerpt": "A validated source excerpt.",
+                    "support_type": "supports",
+                }],
+            }]
+        }
+        mock_synthesize.return_value = {
+            "answer": "**Citation Validation Failed:** invalid references.",
+            "insufficient_evidence": False,
+            "citation_diagnostics": [
+                "S7",
+                "1",
+                "https://bad.example/reference",
+                "www.bad.example/reference",
+                "S8",
+                "S9",
+                "arbitrary text",
+                "line\nbreak",
+                "a" * 100,
+            ],
+        }
+
+        result = agent.run_agent("test question")
+
+        diagnostic = next(
+            item for item in result.limitations
+            if "Citation validation rejected" in item
+        )
+        self.assertIn("S7", diagnostic)
+        self.assertIn("1", diagnostic)
+        self.assertIn("https://bad.example/reference", diagnostic)
+        self.assertIn("www.bad.example/reference", diagnostic)
+        self.assertIn("S8", diagnostic)
+        self.assertNotIn("S9", diagnostic)
+        self.assertNotIn("arbitrary text", diagnostic)
+        self.assertNotIn("line", diagnostic)
+        self.assertNotIn("a" * 100, diagnostic)
+        self.assertEqual(diagnostic.count(",") + 1, 5)
 
     @patch("src.agent.synthesize_answer")
     @patch("src.agent.extract_evidence")
