@@ -27,6 +27,28 @@ class AgentEvidenceTests(unittest.TestCase):
             },
         ]
 
+    def _conflicting_measurement_claims(self, values):
+        return [
+            Claim(
+                id=f"claim_{source_id}",
+                text=(
+                    "The global annual atmospheric CO2 average was "
+                    f"{value} ppm in 2024."
+                ),
+                confidence="high",
+                verification_status="supported",
+                evidence=[Evidence(
+                    source_id=source_id,
+                    excerpt=(
+                        "The global annual atmospheric CO2 average was "
+                        f"{value} ppm in 2024."
+                    ),
+                    support_type="supports",
+                )],
+            )
+            for source_id, value in values.items()
+        ]
+
     def test_assign_source_ids_is_stable_and_ordered(self):
         retrieved = [
             {"title": "One", "url": "https://example.com/one", "content": "One"},
@@ -554,6 +576,316 @@ class AgentEvidenceTests(unittest.TestCase):
         self.assertTrue(conflict)
         self.assertTrue(any("unresolved" in item.lower() for item in summaries))
         self.assertFalse(any("potential genuine conflict candidate" in item.lower() for item in summaries))
+
+    def test_nested_same_publication_values_remain_unresolved(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Primary report A",
+                "url": "https://example.gov/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": "same_publication"},
+                    "evidence_independence": "unknown",
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Primary report mirror",
+                "url": "https://archive.example/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "same_publication"},
+                    "evidence_independence": "unknown",
+                },
+            },
+        ]
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+        self.assertFalse(any("genuine conflict candidate" in item.lower() for item in summaries))
+        self.assertFalse(any("independent corroboration" in item.lower() for item in summaries))
+
+    def test_nested_distinct_publications_are_not_independent_conflict(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Primary report A",
+                "url": "https://example.gov/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": "distinct_publications"},
+                    "evidence_independence": "unknown",
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Primary report B",
+                "url": "https://example.gov/b",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "distinct_publications"},
+                    "evidence_independence": "unknown",
+                },
+            },
+        ]
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("potential comparable-value discrepancy" in item.lower() for item in summaries))
+        self.assertFalse(any("genuine conflict candidate" in item.lower() for item in summaries))
+        self.assertFalse(any("independent" in item.lower() for item in summaries))
+
+    def test_malformed_relationship_value_is_unresolved(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": ["distinct_publications"]},
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Report B",
+                "url": "https://example.org/b",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "unknown"},
+                },
+            },
+        ]
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+        self.assertFalse(any("potential comparable-value discrepancy" in item.lower() for item in summaries))
+
+    def test_malformed_relationship_in_either_direction_cannot_be_distinct(self):
+        for malformed_source, other_source in (("S1", "S2"), ("S2", "S1")):
+            sources = [
+                {
+                    "id": "S1",
+                    "title": "Report A",
+                    "url": "https://example.org/a",
+                    "source_role": "primary",
+                    "publication_metadata": {
+                        "relationships": {
+                            "S2": (
+                                {"relationship": "distinct_publications"}
+                                if malformed_source == "S1"
+                                else "distinct_publications"
+                            ),
+                        },
+                    },
+                },
+                {
+                    "id": "S2",
+                    "title": "Report B",
+                    "url": "https://example.org/b",
+                    "source_role": "primary",
+                    "publication_metadata": {
+                        "relationships": {
+                            "S1": (
+                                {"relationship": "distinct_publications"}
+                                if malformed_source == "S2"
+                                else "distinct_publications"
+                            ),
+                        },
+                    },
+                },
+            ]
+
+            _, summaries = agent.detect_numerical_conflicts(
+                self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+                sources,
+            )
+
+            self.assertFalse(
+                any("potential comparable-value discrepancy" in item.lower() for item in summaries),
+                msg=f"Malformed relationship from {malformed_source} was treated as distinct",
+            )
+            self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+
+    def test_explicit_independence_metadata_does_not_promote_genuine_conflict(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": "distinct_publications"},
+                    "evidence_independence": "independent",
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Report B",
+                "url": "https://example.org/b",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "distinct_publications"},
+                    "evidence_independence": "independent",
+                },
+            },
+        ]
+
+        _, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(any("potential comparable-value discrepancy" in item.lower() for item in summaries))
+        self.assertFalse(any("genuine conflict candidate" in item.lower() for item in summaries))
+
+    def test_nested_unknown_relationship_remains_unresolved(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": "unknown"},
+                    "evidence_independence": "unknown",
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Report B",
+                "url": "https://example.org/b",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "unknown"},
+                    "evidence_independence": "unknown",
+                },
+            },
+        ]
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+
+    def test_assign_source_ids_nested_metadata_is_consumed_by_detector(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "retrieved-1",
+                "title": "Primary report A",
+                "url": "https://example.gov/a",
+                "content": "The report identifier is publication-123.",
+                "retrieved_metadata": {"provenance_id": "publication-123"},
+            },
+            {
+                "id": "retrieved-2",
+                "title": "Primary report mirror",
+                "url": "https://archive.example/a",
+                "content": "The originating publication is publication-123.",
+                "retrieved_metadata": {
+                    "originating_publication": "publication-123"
+                },
+            },
+        ])
+        sources = agent.assign_source_roles(sources)
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+        self.assertFalse(any("genuine conflict candidate" in item.lower() for item in summaries))
+
+    def test_unknown_evidence_independence_does_not_promote_distinct_ids(self):
+        sources = [
+            {
+                "id": "S1",
+                "title": "Primary report A",
+                "url": "https://example.gov/a",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S2": "distinct_publications"},
+                    "evidence_independence": "unknown",
+                },
+            },
+            {
+                "id": "S2",
+                "title": "Primary report B",
+                "url": "https://example.gov/b",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": {"S1": "distinct_publications"},
+                    "evidence_independence": "unknown",
+                },
+            },
+        ]
+
+        _, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims({"S1": 420, "S2": 421}),
+            sources,
+        )
+
+        self.assertFalse(any("potential genuine conflict candidate" in item.lower() for item in summaries))
+
+    def test_same_publication_pair_prevents_three_source_independence(self):
+        relationships = {
+            "S1": {
+                "S2": "same_publication",
+                "S3": "distinct_publications",
+            },
+            "S2": {
+                "S1": "same_publication",
+                "S3": "distinct_publications",
+            },
+            "S3": {
+                "S1": "distinct_publications",
+                "S2": "distinct_publications",
+            },
+        }
+        sources = [
+            {
+                "id": source_id,
+                "title": f"Primary report {source_id}",
+                "url": f"https://example.gov/{source_id.lower()}",
+                "source_role": "primary",
+                "publication_metadata": {
+                    "relationships": relationships[source_id],
+                    "evidence_independence": "unknown",
+                },
+            }
+            for source_id in ("S1", "S2", "S3")
+        ]
+
+        conflict, summaries = agent.detect_numerical_conflicts(
+            self._conflicting_measurement_claims(
+                {"S1": 420, "S2": 421, "S3": 422}
+            ),
+            sources,
+        )
+
+        self.assertTrue(conflict)
+        self.assertTrue(any("unresolved" in item.lower() for item in summaries))
+        self.assertFalse(any("genuine conflict candidate" in item.lower() for item in summaries))
 
     def test_two_secondary_sources_with_different_values_are_ignored(self):
         sources = [
