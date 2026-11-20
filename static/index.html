@@ -3,219 +3,691 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Veritas — Evidence-Grounded Research Agent</title>
+<title>VeriFAI — Evidence-Grounded Research Agent</title>
+<link rel="icon" href="/static/VeriFAI-logo-mark.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','ui-monospace','monospace'] } } } };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 <style>
-  html { scroll-behavior: smooth; }
-  body { background: #070b14; color: #e8edf5; font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv11','ss03'; }
-  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
-    background: radial-gradient(60% 40% at 50% -5%, rgba(56,189,248,.10), transparent 70%), radial-gradient(40% 30% at 90% 10%, rgba(99,102,241,.08), transparent 70%); }
-  .glass { background: rgba(15,23,42,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(30,41,59,.8); }
-  @keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
-  .fade-in { animation: fadeUp .5s ease both; }
-  .hero { transition: max-height .6s ease, opacity .4s ease, margin .6s ease; max-height: 700px; overflow: hidden; position: relative; isolation: isolate; }
-  body.results .hero { max-height: 0; opacity: 0; margin: 0; pointer-events: none; }
-  #compactForm { transition: opacity .5s ease .15s; opacity: 0; pointer-events: none; }
-  body.results #compactForm { opacity: 1; pointer-events: auto; }
-  body.results #brandText { display: none; }
-  @media (min-width: 640px) { body.results #brandText { display: block; } }
-  .citation-badge { display:inline-flex; align-items:center; justify-content:center; min-width:1.4rem; height:1.4rem; padding:0 .45rem; margin:0 .12rem; vertical-align:.08em; line-height:1;
-    font: 600 .68rem 'JetBrains Mono', monospace; color:#67e8f9; background:linear-gradient(180deg, rgba(34,211,238,.20), rgba(56,189,248,.09)); border:1px solid rgba(34,211,238,.42);
-    border-radius:999px; cursor:pointer; text-decoration:none; transition: background .15s, color .15s, box-shadow .15s, transform .15s; }
-  .citation-badge:hover { background:#22d3ee; color:#042f3a; box-shadow:0 0 14px rgba(34,211,238,.45); transform: translateY(-1px); }
-  .flash { animation: flash 1.8s ease; }
-  @keyframes flash { 0%,30% { box-shadow: 0 0 0 2px rgba(56,189,248,.9), 0 0 28px rgba(56,189,248,.35); border-color: rgba(56,189,248,.9); } 100% { box-shadow: none; } }
-  .prose-a { font-size: 1.0625rem; color:#e8edf5; letter-spacing:-.005em; line-height:1.7; overflow-wrap:anywhere; }
-  .prose-a > :first-child { margin-top:0 !important; }
-  .prose-a > :last-child { margin-bottom:0 !important; }
-  .prose-a p { margin:0 0 1rem; line-height:1.75; }
-  .prose-a strong { color:#f8fafc; font-weight:600; }
-  .prose-a em { color:#cbd5e1; }
-  .prose-a h1 { font-size:1.5rem; font-weight:700; color:#f8fafc; margin:2rem 0 .85rem; line-height:1.25; letter-spacing:-.02em; }
-  .prose-a h2 { font-size:1.3rem; font-weight:650; color:#f8fafc; margin:2rem 0 .75rem; padding-bottom:.45rem; border-bottom:1px solid rgba(30,41,59,.9); line-height:1.3; letter-spacing:-.01em; }
-  .prose-a h3 { font-size:1.125rem; font-weight:600; color:#f1f5f9; margin:1.6rem 0 .5rem; line-height:1.35; }
-  .prose-a h4 { font-size:.78rem; font-weight:600; color:#38bdf8; margin:1.4rem 0 .45rem; letter-spacing:.07em; text-transform:uppercase; }
-  .prose-a ul, .prose-a ol { margin:0 0 1rem; padding-left:1.5rem; }
-  .prose-a ul { list-style:disc; }
-  .prose-a ol { list-style:decimal; }
-  .prose-a li { margin-bottom:.4rem; line-height:1.7; padding-left:.2rem; }
-  .prose-a li::marker { color:#38bdf8; }
-  .prose-a li > ul, .prose-a li > ol { margin:.4rem 0 .2rem; }
-  .prose-a li > p { margin-bottom:.4rem; }
-  .prose-a blockquote { margin:1.25rem 0; padding:.75rem 1rem .75rem 1.1rem; border-left:3px solid rgba(56,189,248,.6); background:rgba(56,189,248,.05); border-radius:0 10px 10px 0; color:#cbd5e1; }
-  .prose-a blockquote p:last-child { margin-bottom:0; }
-  .prose-a hr { border:0; border-top:1px solid rgba(30,41,59,.9); margin:1.75rem 0; }
-  .prose-a a:not(.citation-badge) { color:#38bdf8; text-decoration:underline; text-decoration-color:rgba(56,189,248,.4); text-underline-offset:3px; transition:.15s; }
-  .prose-a a:not(.citation-badge):hover { color:#7dd3fc; text-decoration-color:currentColor; }
-  .prose-a img { max-width:100%; border-radius:10px; }
-  .prose-a pre { margin:1.25rem 0; padding:.9rem 1rem; overflow-x:auto; background:rgba(2,6,23,.7); border:1px solid rgba(30,41,59,.9); border-radius:12px; font-size:.85rem; line-height:1.6; }
-  .prose-a pre code { background:none; padding:0; }
-  .prose-a code { font-family:'JetBrains Mono',monospace; font-size:.85em; background:rgba(30,41,59,.8); padding:1px 5px; border-radius:4px; }
-  /* tables */
-  .prose-a .table-wrap { overflow-x:auto; margin:1.25rem 0; border:1px solid rgba(51,65,85,.8); border-radius:12px; background:rgba(2,6,23,.35); -webkit-overflow-scrolling:touch; }
-  .prose-a table { width:100%; min-width:28rem; border-collapse:collapse; font-size:.92rem; line-height:1.55; overflow-wrap:normal; }
-  .prose-a th, .prose-a td { padding:10px 14px; text-align:left; vertical-align:top; border:1px solid rgba(30,41,59,.95); }
-  .prose-a thead th { background:rgba(15,23,42,.95); color:#cbd5e1; font-weight:600; font-size:.8rem; letter-spacing:.02em; border-bottom:1px solid #334155; white-space:nowrap; }
-  .prose-a tbody tr:nth-child(even) td { background:rgba(15,23,42,.38); }
-  .prose-a tbody tr:hover td { background:rgba(56,189,248,.06); }
-  .prose-a th:first-child, .prose-a td:first-child { border-left:0; }
-  .prose-a th:last-child, .prose-a td:last-child { border-right:0; }
-  .prose-a thead tr:first-child th { border-top:0; }
-  .prose-a tbody tr:last-child td { border-bottom:0; }
-  .prose-a td:first-child { color:#f1f5f9; font-weight:500; }
+  :root {
+    color-scheme: dark;
+    --royal: #2238ed;
+    --blue: #218cff;
+    --cyan: #08d2ff;
+    --ink: #07154d;
+    --white: #ffffff;
+    --muted: rgba(255,255,255,.76);
+    --glass: rgba(9, 32, 105, .28);
+    --line: rgba(255,255,255,.23);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; background: #1736e7; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    color: var(--white); font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv11','ss03'; overflow-x: hidden; background: transparent;
+  }
+  button, input { font: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+  ::selection { color: #06134c; background: rgba(255,255,255,.8); }
+  :focus-visible { outline: 2px solid white; outline-offset: 4px; }
+
+  /* Full-bleed, softly animated royal-blue waves based on the supplied visual reference. */
+  .blue-world {
+    position: fixed; inset: 0; z-index: -2; overflow: hidden; background: #2240ec; pointer-events: none;
+    --cursor-glow-x: 50vw; --cursor-glow-y: 50vh;
+  }
+  .blue-world::before {
+    content: ''; position: absolute; inset: -12%;
+    background:
+      radial-gradient(ellipse 32% 57% at 48% 72%, rgba(8,210,255,.79) 0%, rgba(12,177,255,.58) 36%, rgba(20,128,255,.28) 59%, transparent 77%),
+      radial-gradient(ellipse 39% 47% at 81% 22%, rgba(14,218,255,.98) 0%, rgba(19,198,255,.92) 28%, rgba(25,145,255,.5) 57%, transparent 78%),
+      radial-gradient(ellipse 43% 57% at 23% 83%, rgba(0,217,255,.98) 0%, rgba(0,165,255,.88) 34%, rgba(20,104,255,.6) 63%, transparent 82%),
+      radial-gradient(ellipse 47% 44% at 53% 106%, rgba(10,211,255,.88) 0%, rgba(30,147,255,.76) 40%, transparent 75%),
+      radial-gradient(ellipse 52% 63% at 5% 4%, #1513c9 0%, rgba(31,37,227,.92) 45%, transparent 75%),
+      linear-gradient(118deg, #2321dc 0%, #1b4ff4 47%, #3188ff 100%);
+    filter: saturate(1.12); animation: oceanDrift 19s ease-in-out infinite alternate; transform-origin: center;
+  }
+  .blue-world::after {
+    content: ''; position: absolute; inset: -15%; opacity: .9; filter: blur(15px);
+    background:
+      radial-gradient(ellipse 42% 20% at 50% 76%, rgba(14,224,255,.46), transparent 72%),
+      radial-gradient(ellipse 42% 23% at 74% 102%, rgba(10,20,198,.9), transparent 76%),
+      radial-gradient(ellipse 34% 24% at 100% 43%, rgba(78,145,255,.65), transparent 75%);
+    animation: waveDrift 24s ease-in-out infinite alternate;
+  }
+  @keyframes oceanDrift {
+    from { transform: translate3d(-1.2%, -.5%, 0) scale(1.02); }
+    to { transform: translate3d(1.4%, 1.4%, 0) scale(1.08); }
+  }
+  @keyframes waveDrift {
+    from { transform: translate3d(1%, -1.5%, 0) scale(1); }
+    to { transform: translate3d(-1.8%, 1.2%, 0) scale(1.06); }
+  }
+  .wave-art {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: .8;
+    transform-origin: center;
+    will-change: transform;
+  }
+  .cursor-glow {
+    position: absolute; left: var(--cursor-glow-x); top: var(--cursor-glow-y);
+    width: min(38vw, 520px); height: min(38vw, 520px); border-radius: 50%;
+    background: radial-gradient(circle, rgba(91,241,255,.38), rgba(33,162,255,.15) 42%, transparent 72%);
+    filter: blur(16px); opacity: .9; transform: translate3d(-50%, -50%, 0);
+    transition: transform .35s ease-out; will-change: transform;
+  }
+  .ambient-orb {
+    position: absolute; width: clamp(180px, 30vw, 460px); aspect-ratio: 1; border-radius: 50%;
+    pointer-events: none; opacity: .46; filter: blur(28px); mix-blend-mode: screen;
+    will-change: transform; animation: ambientFloat 26s ease-in-out infinite alternate;
+  }
+  .ambient-orb.orb-one { top: 8%; left: 9%; background: radial-gradient(circle, rgba(95,236,255,.62), rgba(30,145,255,.12) 65%, transparent 74%); }
+  .ambient-orb.orb-two { right: 3%; bottom: 10%; width: clamp(220px, 38vw, 560px); background: radial-gradient(circle, rgba(70,143,255,.55), rgba(20,35,210,.08) 66%, transparent 76%); animation-duration: 34s; animation-delay: -9s; }
+  .ambient-orb.orb-three { top: 42%; left: 40%; width: clamp(130px, 20vw, 300px); opacity: .28; background: radial-gradient(circle, rgba(143,248,255,.56), transparent 70%); animation-duration: 21s; animation-delay: -5s; }
+  @keyframes ambientFloat {
+    0% { transform: translate3d(-4%, 2%, 0) scale(.92); }
+    50% { transform: translate3d(5%, -4%, 0) scale(1.08); }
+    100% { transform: translate3d(-2%, 6%, 0) scale(.98); }
+  }
+  .wave-form { transform-origin: center; }
+  .wave-shadow { opacity: .62; }
+  body:not(.gsap-ready) .wave-form { animation: ribbonDrift 22s ease-in-out infinite alternate; }
+  body:not(.gsap-ready) .wave-shadow { animation: ribbonDrift 28s ease-in-out infinite alternate-reverse; }
+  @keyframes ribbonDrift { from { transform: translate3d(-1.5%, -.6%, 0); } to { transform: translate3d(1.3%, 1%, 0); } }
+
+  /* Minimal header; branding uses the supplied white VeriFAI mark. */
+  .site-header { position: absolute; z-index: 30; top: 0; left: 0; right: 0; border: 0; background: linear-gradient(180deg, rgba(12,25,130,.2), transparent); }
+  .header-inner { width: min(1240px, calc(100% - 64px)); min-height: 78px; margin: 0 auto; display: flex; align-items: center; gap: 24px; }
+  #homeBtn.brand { padding: 0; border: 0; background: transparent; display: flex; align-items: center; gap: 10px; flex: 0 0 auto; color: white; cursor: pointer; }
+  .brand-lockup { width: 122px; height: auto; object-fit: contain; display: block; filter: brightness(0) invert(1); }
+  #compactForm { display: flex; flex: 1 1 auto; max-width: 650px; align-items: center; gap: 8px; margin: 0 auto; opacity: 0; pointer-events: none; transition: opacity .35s ease, transform .35s ease; transform: translateY(-7px); }
+  #compactForm .compact-field { flex: 1; min-width: 0; }
+  #compactInput { width: 100%; min-height: 44px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: #fff; padding: 0 18px; background: rgba(19,40,151,.36); backdrop-filter: blur(18px); box-shadow: inset 0 1px rgba(255,255,255,.07); }
+  #compactInput::placeholder { color: rgba(255,255,255,.7); }
+  #compactInput:focus { border-color: rgba(255,255,255,.75); outline: none; background: rgba(16,40,147,.53); }
+  .compactBtn { border: 1px solid rgba(255,255,255,.95); background: #fff; color: #1836c8; border-radius: 999px; font-weight: 600; letter-spacing: -.01em; padding: 12px 19px; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+  .compactBtn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(9,28,128,.2); background: #f2fbff; }
+  .compactBtn:disabled { opacity: .5; cursor: wait; transform: none; }
+  #healthBadge { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; color: rgba(255,255,255,.78); border: 1px solid rgba(255,255,255,.23); background: rgba(21,47,164,.2); border-radius: 999px; padding: 7px 11px; font-size: 11px; backdrop-filter: blur(10px); white-space: nowrap; }
+  #healthDot { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: rgba(255,255,255,.75); box-shadow: 0 0 9px currentColor; }
+  #healthText { color: rgba(255,255,255,.8); font: 500 10px 'JetBrains Mono', monospace; }
+  #statusPill { display: inline-flex; font-size: 11px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.94); color: #203bd8; border: 1px solid rgba(255,255,255,.9); white-space: nowrap; }
+  #modeBanner { margin-top: 0; backdrop-filter: blur(12px); }
+
+  main { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; flex: 1 0 auto; }
+  .hero {
+    height: 100svh; min-height: 600px; max-height: 1050px; padding: 110px 24px 78px !important; margin: 0 !important;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; isolation: isolate; overflow: hidden;
+    transition: height .7s cubic-bezier(.2,.75,.2,1), min-height .7s ease, padding .7s ease;
+  }
+  .hero-glow { display: none; }
+  .hero-copy {
+    position: relative; width: min(900px, 100%); margin: -26px auto 0; z-index: 1; text-align: center;
+    --hero-scroll-shift: 0px; --hero-scroll-opacity: 1;
+    transform: translateY(calc(-58px + var(--hero-scroll-shift)));
+    opacity: var(--hero-scroll-opacity);
+    will-change: transform, opacity;
+  }
+  .hero-eyebrow, .hero-footnote { display: none !important; }
+  #healthBadge { border: 0; background: transparent; padding: 8px; box-shadow: none; display: none !important; }
+  body.results #healthBadge { display: inline-flex !important; }
+  #healthText { display: none !important; }
+  #modeBanner { display: none !important; }
+  .hero-eyebrow { font: 500 10px/1.4 'Poppins', sans-serif; letter-spacing: .17em; text-transform: uppercase; color: rgba(255,255,255,.76); margin-bottom: 21px; text-shadow: 0 1px 14px rgba(0,30,140,.15); }
+  .hero h1 {
+    font-family: 'Poppins', sans-serif; font-size: clamp(2.25rem, 4.8vw, 4.5rem) !important; font-weight: 700 !important;
+    line-height: 1.12 !important; letter-spacing: -.055em !important; color: #fff !important; text-wrap: balance;
+    text-shadow: 0 2px 24px rgba(8,42,155,.14); max-width: 950px; margin: 0 auto !important;
+  }
+  .hero-subtitle { max-width: 510px; margin: 18px auto 0 !important; font-size: 12px; line-height: 1.8; font-weight: 400; color: rgba(255,255,255,.81); text-wrap: balance; }
+  .hero-actions { margin: 24px auto 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .hero-cta { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(255,255,255,.84); border-radius: 999px; padding: 0 17px; font-size: 10px; font-weight: 600; text-decoration: none; letter-spacing: -.01em; cursor: pointer; transition: transform .22s ease, background .22s ease, box-shadow .22s ease; }
+  .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,29,132,.18); }
+  .hero-cta.primary { color: #1637b9; background: #fff; }
+  .hero-cta.secondary { color: #fff; background: rgba(35,101,243,.12); backdrop-filter: blur(8px); }
+  .hero-cta.secondary:hover { background: rgba(255,255,255,.16); }
+  .hero-search-panel { display: none; width: min(590px, 100%); margin: 25px auto 0; }
+  .hero.search-open .hero-actions { display: none; }
+  .hero.search-open .hero-search-panel { display: block; animation: arrive .35s ease both; }
+  #heroForm { display: flex; align-items: center; gap: 8px; margin: 0 auto !important; padding: 6px; width: 100%; max-width: none; border-radius: 999px; border: 1px solid rgba(255,255,255,.48); background: rgba(18,48,155,.25); box-shadow: 0 14px 35px rgba(3,29,125,.14), inset 0 1px rgba(255,255,255,.13); backdrop-filter: blur(16px); }
+  #heroInput { min-width: 0; flex: 1; padding: 11px 14px; border: 0; outline: none; background: transparent; color: white; font-size: 13px; }
+  #heroInput::placeholder { color: rgba(255,255,255,.77); }
+  #heroForm .compactBtn { padding: 10px 17px; font-size: 11px; }
+  .search-close { appearance: none; border: 0; background: none; color: rgba(255,255,255,.8); cursor: pointer; font-size: 11px; margin-top: 10px; }
+  .hero-footnote { margin-top: 19px; font-size: 10px; color: rgba(255,255,255,.7); letter-spacing: .015em; }
+  .scroll-cue { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.84); display: flex; flex-direction: column; align-items: center; gap: 5px; font: 500 9px/1 'Poppins', sans-serif; transition: opacity .3s ease, transform .3s ease; }
+  body.scrolled .scroll-cue { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
+  .mouse-outline { width: 12px; height: 20px; border: 1.5px solid rgba(255,255,255,.92); border-radius: 8px; display: block; position: relative; }
+  .mouse-outline::after { content: ''; width: 2px; height: 4px; background: white; border-radius: 4px; position: absolute; left: 3.5px; top: 3px; animation: scrollDot 1.6s ease-in-out infinite; }
+  @keyframes scrollDot { 0% { transform: translateY(0); opacity: .9; } 70% { transform: translateY(6px); opacity: .2; } 100% { transform: translateY(0); opacity: .9; } }
+  .corner-dot { position: absolute; bottom: 12px; width: 8px; height: 8px; border-radius: 50%; background: white; box-shadow: 0 0 12px rgba(255,255,255,.4); }
+  .corner-dot.left { left: 13px; } .corner-dot.right { right: 13px; }
+  .hero::after { display: none; }
+
+  /* A smooth transition into the persistent research workspace. */
+  body.results .hero { height: 47svh; min-height: 360px; max-height: 520px; padding-top: 100px !important; padding-bottom: 60px !important; }
+  body.results .hero-copy { margin-top: -4px; transform: translateY(calc(-8px + var(--hero-scroll-shift))); }
+  body.results .hero-eyebrow { display: none; }
+  body.results .hero h1 { font-size: clamp(2rem, 3.3vw, 3rem) !important; }
+  body.results .hero-subtitle { margin-top: 10px !important; font-size: 11px; }
+  body.results .hero-actions { margin-top: 17px; }
+  body.results .hero-cta { min-height: 30px; }
+  body.results .scroll-cue { display: none; }
+  body.results #compactForm { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  body.results #examples, body.results #evidenceJourney, body.results #methodSection, body.results .research-bridge { display: none; }
+  body.results .site-header { position: fixed; background: linear-gradient(180deg, rgba(22,41,181,.7), rgba(22,41,181,.08)); backdrop-filter: blur(10px); }
+
+  #examples { width: min(1080px, calc(100% - 48px)); margin: 20px auto 72px; scroll-margin-top: 28px; }
+  .section-kicker { text-align: center; color: rgba(255,255,255,.7); font: 500 10px/1.3 'Poppins',sans-serif; text-transform: uppercase; letter-spacing: .18em; }
+  .section-heading { font: 600 clamp(1.35rem, 2.8vw, 2rem)/1.25 'Poppins',sans-serif; letter-spacing: -.04em; text-align: center; color: white; margin: 10px 0 8px; }
+  .section-intro { text-align: center; color: rgba(255,255,255,.76); font-size: 12px; line-height: 1.7; max-width: 480px; margin: 0 auto 24px; }
+  #presets { display: grid !important; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px !important; text-align: left; max-width: 780px; margin: 0 auto; }
+  #presets button { display: flex; align-items: flex-start; gap: 13px; padding: 17px 18px; width: 100%; min-width: 0; text-align: left; border: 1px solid rgba(255,255,255,.22) !important; border-radius: 15px !important; background: rgba(15,38,143,.22) !important; box-shadow: inset 0 1px rgba(255,255,255,.07); color: #fff !important; backdrop-filter: blur(15px); transition: transform .22s ease, background .22s ease, border-color .22s ease; }
+  #presets button:hover { transform: translateY(-3px); background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.54) !important; }
+  #presets button > i { display: none; }
+  #presets button span span:first-child { color: white; font: 500 12px/1.5 'Poppins',sans-serif; white-space: normal; }
+  #presets button span span:last-child { color: rgba(255,255,255,.7) !important; font-size: 10px; margin-top: 3px; }
+
+  .value-section { width: min(1080px, calc(100% - 48px)); margin: 0 auto 92px; }
+  .value-section .section-intro { margin-bottom: 30px; }
+  .method-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 960px; margin: 0 auto; }
+  .method-card { min-height: 205px; padding: 22px; border: 1px solid rgba(255,255,255,.19); border-radius: 18px; background: linear-gradient(145deg, rgba(20,59,170,.4), rgba(7,25,103,.3)); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 18px 45px rgba(3,21,105,.1); backdrop-filter: blur(15px); }
+  .method-number { display: inline-flex; align-items: center; justify-content: center; width: 31px; height: 31px; border: 1px solid rgba(159,239,255,.5); border-radius: 50%; color: #b7f4ff; font: 500 11px 'JetBrains Mono', monospace; }
+  .method-card h3 { margin: 22px 0 8px; color: #fff; font: 600 15px/1.3 'Poppins', sans-serif; letter-spacing: -.025em; }
+  .method-card p { margin: 0; color: rgba(255,255,255,.69); font-size: 11px; line-height: 1.75; }
+  .signal-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; max-width: 960px; margin: 34px auto 0; overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 15px; background: rgba(255,255,255,.13); }
+  .signal { padding: 16px 18px; background: rgba(7,26,111,.34); }
+  .signal strong { display: block; color: #fff; font: 600 11px/1.4 'Poppins', sans-serif; }
+  .signal span { display: block; margin-top: 4px; color: rgba(255,255,255,.6); font-size: 10px; line-height: 1.5; }
+  .research-bridge { width: min(980px, calc(100% - 48px)); margin: 0 auto 62px; padding: 24px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border: 1px solid rgba(255,255,255,.18); border-radius: 18px; background: rgba(10,35,135,.28); backdrop-filter: blur(14px); }
+  .research-bridge h2 { margin: 0 0 6px; color: white; font: 600 18px/1.3 'Poppins', sans-serif; letter-spacing: -.035em; }
+  .research-bridge p { margin: 0; max-width: 590px; color: rgba(255,255,255,.68); font-size: 11px; line-height: 1.7; }
+  .bridge-mark { flex: 0 0 auto; color: #a9efff; font: 500 10px/1.5 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: .12em; }
+  .journey-section { width: min(1180px, calc(100% - 48px)); margin: 0 auto 12vw; }
+  .journey-intro { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 64px; align-items: end; margin-bottom: 42px; }
+  .journey-intro .section-heading { text-align: left; margin-bottom: 0; }
+  .journey-intro .section-intro { text-align: left; margin: 0; max-width: 520px; }
+  .journey-track { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); gap: clamp(32px, 6vw, 92px); min-height: 600px; }
+  .journey-rail { position: sticky; top: 16vh; align-self: start; min-height: 420px; padding: 28px; border: 1px solid rgba(255,255,255,.2); border-radius: 24px; background: linear-gradient(160deg, rgba(20,66,182,.42), rgba(4,22,92,.42)); box-shadow: inset 0 1px rgba(255,255,255,.1), 0 24px 70px rgba(3,20,105,.16); backdrop-filter: blur(18px); overflow: hidden; }
+  .journey-rail::before { content: ''; position: absolute; inset: 14px; border: 1px solid rgba(161,241,255,.22); border-radius: 17px; pointer-events: none; }
+  .rail-topline { position: relative; display: flex; justify-content: space-between; color: rgba(255,255,255,.68); font: 500 10px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; }
+  .signal-orbit { position: relative; display: grid; place-items: center; min-height: 260px; margin: 28px 0 24px; }
+  .signal-orbit::before, .signal-orbit::after { content: ''; position: absolute; border: 1px solid rgba(155,240,255,.36); border-radius: 50%; animation: orbitPulse 5.5s ease-in-out infinite; }
+  .signal-orbit::before { width: 184px; height: 184px; }
+  .signal-orbit::after { width: 280px; height: 280px; opacity: .46; animation-delay: -2.2s; }
+  .orbit-core { position: relative; z-index: 1; width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: #0c2ba8; background: radial-gradient(circle at 34% 28%, #e8fdff, #8ceeff 43%, #28a9ff 100%); box-shadow: 0 0 0 12px rgba(112,236,255,.1), 0 0 55px rgba(87,224,255,.58); font: 700 14px 'Poppins', sans-serif; letter-spacing: -.04em; }
+  .orbit-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #d7fbff; box-shadow: 0 0 14px #b8f8ff; }
+  .orbit-dot.one { top: 24px; right: 24%; } .orbit-dot.two { bottom: 30px; left: 18%; } .orbit-dot.three { top: 42%; right: 7%; }
+  .rail-caption { position: relative; max-width: 250px; margin: 0; color: rgba(255,255,255,.78); font-size: 12px; line-height: 1.7; }
+  .journey-stages { display: grid; gap: 14px; }
+  .journey-stage { min-height: 180px; padding: 26px 28px; border-top: 1px solid rgba(255,255,255,.23); opacity: .48; transition: opacity .45s ease, transform .45s ease, border-color .45s ease; }
+  .journey-stage.is-active { opacity: 1; transform: translateX(10px); border-color: rgba(174,245,255,.8); }
+  .stage-meta { display: flex; align-items: center; gap: 12px; color: #b6f5ff; font: 500 10px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; }
+  .stage-index { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid rgba(174,245,255,.55); border-radius: 50%; }
+  .journey-stage h3 { margin: 24px 0 8px; color: #fff; font: 600 clamp(1.25rem, 2.4vw, 2rem)/1.15 'Poppins', sans-serif; letter-spacing: -.045em; }
+  .journey-stage p { max-width: 470px; margin: 0; color: rgba(255,255,255,.68); font-size: 12px; line-height: 1.8; }
+  @keyframes orbitPulse { 0%, 100% { transform: scale(.96); opacity: .35; } 50% { transform: scale(1.04); opacity: .75; } }
+  @media (max-width: 700px) {
+    .journey-section { width: calc(100% - 32px); margin-bottom: 72px; }
+    .journey-intro { grid-template-columns: 1fr; gap: 14px; margin-bottom: 28px; }
+    .journey-intro .section-heading, .journey-intro .section-intro { text-align: left; }
+    .journey-track { grid-template-columns: 1fr; gap: 24px; min-height: 0; }
+    .journey-rail { position: relative; top: auto; min-height: 360px; padding: 22px; }
+    .signal-orbit { min-height: 200px; margin: 16px 0; }
+    .signal-orbit::before { width: 140px; height: 140px; } .signal-orbit::after { width: 215px; height: 215px; }
+    .journey-stage { min-height: 0; padding: 22px 4px; }
+    .journey-stage.is-active { transform: none; }
+  }
+
+  #validationNotice, #errorBox, #loadingBox { width: min(820px, calc(100% - 48px)); margin-left: auto !important; margin-right: auto !important; border-radius: 16px; backdrop-filter: blur(18px); }
+  #validationNotice { color: #fff1c4 !important; background: rgba(117,74,4,.26) !important; border-color: rgba(255,225,140,.36) !important; }
+  #errorBox { color: #ffe4e6 !important; background: rgba(92,12,65,.25) !important; border-color: rgba(255,180,210,.38) !important; }
+  #loadingBox { color: white; border: 1px solid rgba(255,255,255,.22); background: rgba(8,29,117,.31); box-shadow: 0 18px 45px rgba(3,21,105,.14); }
+  #stages { list-style: none; padding: 0; }
+  .stage-dot { border-color: rgba(255,255,255,.3) !important; }
+
+  #resultsContainer { width: min(1180px, calc(100% - 48px)); margin: 0 auto 60px; padding: 22px 0 0 !important; gap: 20px !important; }
+  #resultsContainer .glass { background: rgba(7,23,89,.56); border: 1px solid rgba(255,255,255,.2); box-shadow: 0 18px 55px rgba(4,23,113,.12), inset 0 1px rgba(255,255,255,.06); backdrop-filter: blur(16px); }
+  #answerCard { border-radius: 20px !important; }
+  #questionEcho { font-family: 'Poppins',sans-serif; font-weight: 600; letter-spacing: -.035em; color: white !important; }
+  #answerContent { color: rgba(255,255,255,.91) !important; }
+  .prose-a { font-size: 14px; color: rgba(255,255,255,.9); overflow-wrap: anywhere; line-height: 1.75; }
+  .prose-a p { margin: 0 0 1rem; line-height: 1.75; }
+  .prose-a strong, .prose-a h1, .prose-a h2, .prose-a h3 { color: white; }
+  .prose-a h1 { font-size: 1.45rem; font-weight: 700; margin: 2rem 0 .85rem; }
+  .prose-a h2 { font-size: 1.25rem; font-weight: 650; margin: 1.8rem 0 .75rem; padding-bottom: .45rem; border-bottom: 1px solid rgba(255,255,255,.17); }
+  .prose-a h3 { font-size: 1.08rem; font-weight: 600; margin: 1.4rem 0 .5rem; }
+  .prose-a h4 { font-size: .78rem; font-weight: 600; color: #9cecff; margin: 1.3rem 0 .45rem; letter-spacing: .07em; text-transform: uppercase; }
+  .prose-a ul, .prose-a ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+  .prose-a li { margin-bottom: .4rem; line-height: 1.7; padding-left: .2rem; }
+  .prose-a li::marker { color: #8deaff; }
+  .prose-a blockquote { margin: 1.25rem 0; padding: .75rem 1rem; border-left: 3px solid #93e9ff; background: rgba(255,255,255,.06); border-radius: 0 10px 10px 0; color: rgba(255,255,255,.81); }
+  .prose-a a:not(.citation-badge) { color: #b7f2ff; text-decoration: underline; text-decoration-color: rgba(183,242,255,.4); text-underline-offset: 3px; }
+  .prose-a pre { margin: 1.25rem 0; padding: .9rem 1rem; overflow-x: auto; background: rgba(3,12,59,.55); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; font-size: .85rem; }
+  .prose-a code { font-family: 'JetBrains Mono',monospace; font-size: .85em; background: rgba(255,255,255,.12); padding: 1px 5px; border-radius: 4px; }
+  .prose-a .table-wrap { overflow-x: auto; margin: 1.25rem 0; border: 1px solid rgba(255,255,255,.2); border-radius: 12px; background: rgba(3,12,59,.23); }
+  .prose-a table { width: 100%; min-width: 28rem; border-collapse: collapse; font-size: .92rem; line-height: 1.55; }
+  .prose-a th, .prose-a td { padding: 10px 14px; text-align: left; vertical-align: top; border: 1px solid rgba(255,255,255,.14); }
+  .prose-a thead th { background: rgba(8,25,105,.5); color: rgba(255,255,255,.84); font-weight: 600; font-size: .8rem; }
+  .prose-a tbody tr:nth-child(even) td { background: rgba(255,255,255,.035); }
+  .citation-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.4rem; height: 1.4rem; padding: 0 .45rem; margin: 0 .12rem; vertical-align: .08em; line-height: 1; font: 600 .68rem 'JetBrains Mono',monospace; color: #062a9f; background: #bdf6ff; border: 1px solid rgba(255,255,255,.8); border-radius: 999px; cursor: pointer; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+  .citation-badge:hover { box-shadow: 0 0 16px rgba(123,235,255,.5); transform: translateY(-1px); }
+  .flash { animation: sourceFlash 1.6s ease; }
+  @keyframes sourceFlash { 0%,30% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 28px rgba(85,223,255,.4); } 100% { box-shadow: none; } }
+  .prose-a > :first-child { margin-top: 0 !important; } .prose-a > :last-child { margin-bottom: 0 !important; }
+  #resultsContainer h2 { color: rgba(255,255,255,.94); }
+  #resultsContainer button { transition: background .18s ease, border-color .18s ease, color .18s ease; }
+  #sourcesList > div { border-radius: 15px; }
+  #sourcesList a { overflow-wrap: anywhere; }
+  #drawer { background: rgba(7,22,84,.97) !important; border-color: rgba(255,255,255,.2) !important; backdrop-filter: blur(24px); }
+  #drawer pre { color: rgba(255,255,255,.85); white-space: pre-wrap; overflow-wrap: anywhere; }
+  #drawerBackdrop { background: rgba(3,8,50,.45) !important; backdrop-filter: blur(4px); }
+  footer { padding: 25px 24px 30px !important; color: rgba(255,255,255,.58) !important; font-size: 10px !important; line-height: 1.7; }
+  body.results footer { color: rgba(255,255,255,.45) !important; }
+
+  .hidden { display: none !important; }
+  .fade-in { animation: arrive .45s ease both; }
+  .reveal-item {
+    opacity: 0; transform: translateY(14px);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.2,.8,.2,1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal-item.is-visible { opacity: 1; transform: translateY(0); }
+  @keyframes arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .meter-seg { transform-origin: left; animation: meterIn .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes meterIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   details > summary { list-style: none; cursor: pointer; }
   details > summary::-webkit-details-marker { display: none; }
   details[open] .chev { transform: rotate(180deg); }
-  .stage-dot { transition: all .4s ease; }
-  .hero-glow { position:absolute; left:50%; top:9.5rem; width:min(54rem,100%); height:22rem; transform:translateX(-50%); z-index:-1; pointer-events:none; filter:blur(48px);
-    background: radial-gradient(42% 55% at 33% 50%, rgba(99,102,241,.32), transparent 70%), radial-gradient(42% 55% at 67% 50%, rgba(34,211,238,.24), transparent 70%);
-    animation: glowDrift 14s ease-in-out infinite alternate; }
-  @keyframes glowDrift { from { opacity:.75; transform:translateX(-52%) scale(.97); } to { opacity:1; transform:translateX(-48%) scale(1.04); } }
-  .meter-seg { transform-origin:left; animation: meterIn .6s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes meterIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-  #drawer { transition: transform .35s ease; }
-  :focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+  @media (max-width: 700px) {
+    .header-inner { width: calc(100% - 32px); min-height: 64px; gap: 10px; }
+    .brand-lockup { width: 106px; }
+    #healthText { display: none; }
+    #healthBadge { padding: 8px; }
+    #compactForm { position: absolute; top: 67px; left: 16px; right: 16px; max-width: none; }
+    body.results #compactForm { top: 67px; }
+    .hero { min-height: 570px; padding: 95px 22px 70px !important; }
+    .hero-copy { margin-top: -14px; transform: translateY(-22px); }
+    .hero h1 { font-size: clamp(2.25rem, 9.3vw, 3.4rem) !important; }
+    .hero-subtitle { max-width: 390px; font-size: 11px; margin-top: 15px !important; }
+    .hero-eyebrow { margin-bottom: 16px; font-size: 9px; }
+    .hero-actions { margin-top: 21px; }
+    .hero-cta { min-height: 33px; padding: 0 14px; }
+    body.results .hero { height: 420px; min-height: 420px; padding-top: 120px !important; }
+    body.results .hero h1 { font-size: clamp(1.9rem, 7vw, 2.5rem) !important; }
+    body.results .hero-subtitle { max-width: 350px; }
+    #examples { width: calc(100% - 32px); margin: 16px auto 48px; }
+    #presets { grid-template-columns: 1fr; gap: 8px !important; }
+    #presets button { padding: 14px 15px; }
+    .value-section { width: calc(100% - 32px); margin-bottom: 62px; }
+    .method-grid, .signal-strip { grid-template-columns: 1fr; }
+    .method-card { min-height: 0; padding: 18px; }
+    .method-card h3 { margin-top: 16px; }
+    .research-bridge { width: calc(100% - 32px); margin-bottom: 42px; padding: 20px; align-items: flex-start; flex-direction: column; gap: 13px; }
+    #resultsContainer { width: calc(100% - 32px); grid-template-columns: minmax(0,1fr) !important; gap: 16px !important; margin-bottom: 40px; }
+    #resultsContainer .lg\:col-span-2 { grid-column: auto; }
+    #resultsContainer #answerCard { padding: 20px !important; }
+    #resultsContainer #answerCard > div:nth-child(2) { align-items: flex-start; }
+    #copyMdBtn, #jsonBtn { font-size: 10px !important; padding: 7px 9px !important; }
+    #drawer { width: 100% !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .reveal-item { opacity: 1; transform: none; }
+    .journey-stage { opacity: 1; transform: none; }
+  }
 </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased">
+<div class="blue-world" aria-hidden="true">
+<div class="cursor-glow"></div>
+<span class="ambient-orb orb-one"></span>
+<span class="ambient-orb orb-two"></span>
+<span class="ambient-orb orb-three"></span>
+<svg class="wave-art" viewBox="0 0 1440 900" preserveAspectRatio="none" role="presentation">
+  <defs>
+    <linearGradient id="ribbonBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#04ddff" stop-opacity=".9"/>
+      <stop offset=".43" stop-color="#09baff" stop-opacity=".72"/>
+      <stop offset=".76" stop-color="#168cff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#2a46f6" stop-opacity=".14"/>
+    </linearGradient>
+    <linearGradient id="ribbonShadow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1217c8" stop-opacity=".04"/>
+      <stop offset=".48" stop-color="#1018b9" stop-opacity=".58"/>
+      <stop offset="1" stop-color="#141ec4" stop-opacity=".82"/>
+    </linearGradient>
+    <filter id="waveBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="30"/></filter>
+  </defs>
+  <path class="wave-form" d="M-100 615 C35 490 95 280 245 280 C385 280 420 465 565 510 C715 558 790 395 915 345 C1040 295 1110 425 1210 495 C1310 565 1380 535 1540 485 L1540 610 C1400 665 1300 657 1192 588 C1087 520 1020 430 915 432 C790 434 720 612 570 592 C425 570 396 390 272 392 C167 394 80 563 -100 735 Z" fill="url(#ribbonBlue)" filter="url(#waveBlur)"/>
+  <path class="wave-form wave-shadow" d="M-80 825 C120 755 255 630 425 670 C600 710 655 840 825 842 C1010 845 1090 725 1225 742 C1360 760 1415 832 1530 790 L1530 965 L-80 965 Z" fill="url(#ribbonShadow)" filter="url(#waveBlur)"/>
+</svg>
+</div>
 
-<!-- Header with compact search -->
-<header class="sticky top-0 z-30 border-b border-slate-800/80 bg-[#070b14]/80 backdrop-blur-xl">
-  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
-    <button type="button" id="homeBtn" class="flex items-center gap-2.5 shrink-0 cursor-pointer" aria-label="New search">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center font-bold text-slate-950">V</div>
-      <div id="brandText" class="text-left">
-        <div class="font-semibold text-slate-100 leading-tight text-sm">Veritas</div>
-        <div class="text-[11px] text-slate-500 leading-tight">Nebius × Tavily</div>
-      </div>
+<header class="site-header">
+  <div class="header-inner">
+    <button type="button" id="homeBtn" class="brand" aria-label="New search" title="Back to VeriFAI home">
+      <img class="brand-lockup" src="/static/VeriFAI-logo-lockup.svg" alt="VeriFAI" />
     </button>
-    <form id="compactForm" novalidate class="flex-1 flex items-center gap-2 min-w-0">
-      <div class="relative flex-1 min-w-0">
-        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
-        <input id="compactInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask a follow-up or new question…"
-          class="w-full bg-slate-900/70 border border-slate-800/80 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500/70 transition" />
+    <form id="compactForm" novalidate>
+      <div class="compact-field">
+        <input id="compactInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask another research question…" aria-label="Ask another research question" />
       </div>
-      <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold px-4 py-2 rounded-xl transition cursor-pointer shrink-0">Research</button>
+      <button type="submit" class="compactBtn">Research <span aria-hidden="true">↗</span></button>
     </form>
-    <div id="healthBadge" class="flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border border-slate-800 bg-slate-900/60 text-slate-400 shrink-0 ml-auto" title="Backend status">
-      <span id="healthDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-      <span id="healthText" class="hidden sm:inline font-mono text-[11px]">checking…</span>
+    <div id="healthBadge" title="Backend status" aria-live="polite">
+      <span id="healthDot"></span>
+      <span id="healthText">checking…</span>
     </div>
-    <div id="statusPill" class="hidden text-xs px-3 py-1 rounded-full font-medium border shrink-0"></div>
+    <div id="statusPill" class="hidden"></div>
   </div>
-<div id="modeBanner" class="hidden" role="alert"></div>
+  <div id="modeBanner" class="hidden" role="alert"></div>
 </header>
 
-<main class="flex-1 max-w-6xl w-full mx-auto px-4">
-
-  <!-- Hero -->
-  <section class="hero text-center pt-16 sm:pt-28 pb-6">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <div class="inline-flex items-center gap-2 text-xs text-slate-400 border border-slate-800/80 rounded-full px-3 py-1 glass mb-6">
-      <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Every claim checked against its sources
+<main>
+  <section class="hero" id="heroSection" aria-labelledby="heroTitle">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">Evidence-first AI research</div>
+      <h1 id="heroTitle">Know what’s true.<br />See the evidence.</h1>
+      <p class="hero-subtitle">Research with clarity. Verify every claim against real sources, and know what the evidence actually supports.</p>
+      <div class="hero-actions">
+        <button type="button" class="hero-cta primary" id="openSearch">Start researching <span aria-hidden="true">↗</span></button>
+        <a class="hero-cta secondary" href="#examples">Try a sample question</a>
+      </div>
+      <div class="hero-search-panel" id="heroSearchPanel">
+        <form id="heroForm" novalidate>
+          <input id="heroInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask a question worth verifying…" aria-label="Your research question" />
+          <button type="submit" class="compactBtn">Research <span aria-hidden="true">↗</span></button>
+        </form>
+        <button type="button" class="search-close" id="closeSearch">Close</button>
+      </div>
+      <div class="hero-footnote">Cited answers <span aria-hidden="true">·</span> Claim-level verification <span aria-hidden="true">·</span> Traceable sources</div>
     </div>
-    <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-slate-50">What do you want to verify?</h1>
-    <p class="mt-3 text-slate-400 max-w-xl mx-auto">Ask a question and get a cited answer, with each claim marked supported, contradicted or unverified.</p>
-    <form id="heroForm" novalidate class="mt-8 max-w-2xl mx-auto glass rounded-2xl p-2 flex items-center gap-2 shadow-2xl shadow-sky-950/30 focus-within:border-sky-500/60 transition">
-      <i data-lucide="search" class="w-5 h-5 text-slate-500 ml-3 shrink-0"></i>
-      <input id="heroInput" type="text" minlength="5" maxlength="1000" required placeholder="Ask a research question that needs verifiable sources…"
-        class="flex-1 min-w-0 bg-transparent px-1 py-3 text-slate-100 placeholder-slate-500 focus:outline-none" />
-      <button type="submit" class="compactBtn bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0 flex items-center gap-2">
-        Research <i data-lucide="arrow-right" class="w-4 h-4"></i>
-      </button>
-    </form>
-    <div class="mt-5 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-2 text-left" id="presets"></div>
+    <a class="scroll-cue" href="#examples" aria-label="Scroll down to sample questions">
+      <span class="mouse-outline" aria-hidden="true"></span>
+      <span>Scroll down</span>
+    </a>
+    <span class="corner-dot left" aria-hidden="true"></span>
+    <span class="corner-dot right" aria-hidden="true"></span>
   </section>
 
-  <!-- Validation notice -->
-  <div id="validationNotice" role="alert" class="hidden mt-4 max-w-2xl mx-auto px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm flex items-center gap-2.5 fade-in">
-    <i data-lucide="info" class="w-4 h-4 shrink-0"></i><span id="validationText"></span>
+  <section id="examples" class="gsap-reveal" aria-labelledby="examplesTitle">
+    <div class="section-kicker">Explore VeriFAI</div>
+    <h2 class="section-heading" id="examplesTitle">Start with a question</h2>
+    <p class="section-intro">Choose a ready-made test or ask your own question. Each report separates supported, contradicted, and unverified claims.</p>
+    <div id="presets"></div>
+  </section>
+
+  <section id="evidenceJourney" class="journey-section" aria-labelledby="journeyTitle">
+    <div class="journey-intro">
+      <div>
+        <div class="section-kicker" style="text-align:left">The evidence trail</div>
+        <h2 class="section-heading" id="journeyTitle">A research process you can follow.</h2>
+      </div>
+      <p class="section-intro">The answer is only the final layer. VeriFAI keeps the path visible, moving from discovery to claim-level confidence without hiding the uncertainty in between.</p>
+    </div>
+    <div class="journey-track">
+      <div class="journey-rail" aria-hidden="true">
+        <div class="rail-topline"><span>Live signal map</span><span>01—03</span></div>
+        <div class="signal-orbit">
+          <span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span>
+          <div class="orbit-core">evidence</div>
+        </div>
+        <p class="rail-caption">Every conclusion stays connected to the sources that shaped it.</p>
+      </div>
+      <div class="journey-stages">
+        <article class="journey-stage is-active">
+          <div class="stage-meta"><span class="stage-index">01</span><span>Discover</span></div>
+          <h3>Find the signal in the noise.</h3>
+          <p>Focused search rounds collect relevant sources while preserving the original context behind every lead.</p>
+        </article>
+        <article class="journey-stage">
+          <div class="stage-meta"><span class="stage-index">02</span><span>Compare</span></div>
+          <h3>Put claims under pressure.</h3>
+          <p>Important statements are separated and checked against evidence that supports, contradicts, or qualifies them.</p>
+        </article>
+        <article class="journey-stage">
+          <div class="stage-meta"><span class="stage-index">03</span><span>Understand</span></div>
+          <h3>Leave with a clearer limit.</h3>
+          <p>Confidence is earned, not implied. When the evidence is thin or mixed, the report makes that visible.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="methodSection" class="value-section" aria-labelledby="methodTitle">
+    <div class="section-kicker">A clearer research loop</div>
+    <h2 class="section-heading" id="methodTitle">From question to confidence</h2>
+    <p class="section-intro">VeriFAI makes the path from an open question to a defensible answer visible, so you can inspect the reasoning instead of taking a black-box result on trust.</p>
+    <div class="method-grid">
+      <article class="method-card gsap-reveal">
+        <span class="method-number">01</span>
+        <h3>Discover the right evidence</h3>
+        <p>Focused search rounds surface relevant sources, preserve their context, and keep the trail attached to the final report.</p>
+      </article>
+      <article class="method-card gsap-reveal">
+        <span class="method-number">02</span>
+        <h3>Check each claim</h3>
+        <p>Important statements are separated into claims and compared with supporting, contradicting, or contextual evidence.</p>
+      </article>
+      <article class="method-card gsap-reveal">
+        <span class="method-number">03</span>
+        <h3>Read the limits</h3>
+        <p>Uncertainty stays visible. When the evidence is thin or mixed, the report says so and shows you where to look next.</p>
+      </article>
+    </div>
+    <div class="signal-strip gsap-reveal" aria-label="Research report features">
+      <div class="signal"><strong>Source-linked</strong><span>Open the exact source behind a citation.</span></div>
+      <div class="signal"><strong>Claim-level</strong><span>See how individual statements were assessed.</span></div>
+      <div class="signal"><strong>Transparent</strong><span>Export the report or inspect its raw response.</span></div>
+    </div>
+  </section>
+
+  <section class="research-bridge gsap-reveal" aria-labelledby="bridgeTitle">
+    <div>
+      <h2 id="bridgeTitle">Ready to investigate something real?</h2>
+      <p>Ask a focused question and VeriFAI will turn the research trail into a readable, cited report you can challenge, share, and revisit.</p>
+    </div>
+    <span class="bridge-mark">Trace every answer</span>
+  </section>
+
+  <div id="validationNotice" role="alert" class="hidden">
+    <span aria-hidden="true">!</span><span id="validationText"></span>
   </div>
 
-  <!-- Error -->
-  <div id="errorBox" class="hidden mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-sm flex gap-3 items-start fade-in">
-    <i data-lucide="octagon-alert" class="w-4 h-4 mt-0.5 shrink-0"></i><div id="errorText"></div>
+  <div id="errorBox" class="hidden" role="alert">
+    <div id="errorText"></div>
   </div>
 
-  <!-- Loading -->
-  <div id="loadingBox" class="hidden mt-8 max-w-2xl mx-auto glass rounded-2xl p-6 fade-in">
+  <div id="loadingBox" class="hidden">
     <div class="flex items-center justify-between mb-5">
       <div class="flex items-center gap-2.5 text-slate-200 font-medium"><i data-lucide="loader-circle" class="w-4 h-4 animate-spin text-sky-400"></i> Researching</div>
-      <div class="font-mono text-sm text-sky-400"><span id="timer">0.0</span>s</div>
+      <div class="font-mono text-sm text-sky-300"><span id="timer">0.0</span>s</div>
     </div>
     <ol id="stages" class="space-y-3"></ol>
-    <p class="mt-5 text-[11px] text-slate-500">Stages advance on an estimated schedule while the server works; the request usually finishes within 10–40 seconds.</p>
+    <p class="mt-5 text-[11px] text-slate-300/70">VeriFAI is gathering sources and checking evidence. Timings vary by query.</p>
   </div>
 
-  <!-- Results -->
+  <!-- Existing research report structure remains connected to the original render logic. -->
   <div id="resultsContainer" class="hidden py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6 min-w-0">
       <div id="statusBanner" class="hidden rounded-2xl border p-4 fade-in" role="status"></div>
       <div id="answerCard" class="glass rounded-2xl p-6 sm:p-8 fade-in">
         <p id="questionEcho" class="text-xl sm:text-2xl font-semibold tracking-tight text-slate-50 mb-5"></p>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <div class="flex items-center gap-2 text-sm font-medium text-sky-400"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-500 font-normal"></span><span id="mockChip" class="hidden ml-2 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded border border-amber-500/50 bg-amber-500/15 text-amber-300">DEMO DATA</span></div>
-          <div class="flex items-center gap-2">
-            <button id="copyMdBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Markdown report</span></button>
-            <button id="jsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-sky-500/60 hover:text-sky-300 text-slate-300 transition cursor-pointer"><i data-lucide="braces" class="w-3.5 h-3.5"></i>View raw JSON</button>
+          <div class="flex flex-wrap items-center gap-2 text-sm font-medium text-sky-200"><i data-lucide="sparkles" class="w-4 h-4"></i> Answer <span id="roundsBadge" class="ml-2 text-xs text-slate-300/70 font-normal"></span><span id="mockChip" class="hidden ml-2 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded border border-amber-200/40 bg-amber-500/15 text-amber-100">DEMO DATA</span></div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="copyMdBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/20 bg-white/5 hover:border-white/50 hover:bg-white/10 text-white/85 transition cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy report</span></button>
+            <button id="jsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/20 bg-white/5 hover:border-white/50 hover:bg-white/10 text-white/85 transition cursor-pointer"><i data-lucide="braces" class="w-3.5 h-3.5"></i>Raw JSON</button>
           </div>
         </div>
         <div id="answerContent" class="prose-a text-slate-200"></div>
-        <div id="metaRow" class="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-500 font-mono"></div>
+        <div id="metaRow" class="mt-4 pt-4 border-t border-white/15 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-200/60 font-mono"></div>
       </div>
-
-      <div id="limitationsBox" class="hidden rounded-2xl p-4 bg-amber-950/20 border border-amber-500/30 fade-in">
-        <h3 class="flex items-center gap-2 text-sm font-medium text-amber-300 mb-2"><i data-lucide="triangle-alert" class="w-4 h-4"></i> Limits of the evidence</h3>
-        <ul id="limitationsList" class="list-disc pl-5 text-sm text-amber-200/90 space-y-1"></ul>
+      <div id="limitationsBox" class="hidden rounded-2xl p-4 bg-amber-950/20 border border-amber-200/25 fade-in">
+        <h3 class="flex items-center gap-2 text-sm font-medium text-amber-100 mb-2"><i data-lucide="triangle-alert" class="w-4 h-4"></i> Limits of the evidence</h3>
+        <ul id="limitationsList" class="list-disc pl-5 text-sm text-amber-50/90 space-y-1"></ul>
       </div>
-
       <section class="space-y-3">
-        <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-slate-400"></i> Claim verification <span class="text-slate-500 font-normal">(<span id="claimCount">0</span>)</span></h2>
+        <h2 class="text-sm font-medium text-white/90 flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-white/75"></i> Claim verification <span class="text-white/60 font-normal">(<span id="claimCount">0</span>)</span></h2>
         <div id="claimFilters" class="hidden flex flex-wrap gap-2" role="group" aria-label="Filter claims by verification status"></div>
         <div id="claimsList" class="space-y-3"></div>
       </section>
     </div>
-
     <aside class="min-w-0">
       <div class="lg:sticky lg:top-20 space-y-3">
-        <h2 class="text-sm font-medium text-slate-300 flex items-center gap-2"><i data-lucide="library" class="w-4 h-4 text-slate-400"></i> Sources <span class="text-slate-500 font-normal">(<span id="sourceCount">0</span>)</span></h2>
-        <p id="sourceMix" class="text-[11px] text-slate-500 -mt-1"></p>
+        <h2 class="text-sm font-medium text-white/90 flex items-center gap-2"><i data-lucide="library" class="w-4 h-4 text-white/75"></i> Sources <span class="text-white/60 font-normal">(<span id="sourceCount">0</span>)</span></h2>
+        <p id="sourceMix" class="text-[11px] text-white/60 -mt-1"></p>
         <div id="sourcesList" class="space-y-3 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1"></div>
       </div>
     </aside>
   </div>
 </main>
 
-<footer class="text-center text-[11px] text-slate-600 py-6">Veritas checks claims against retrieved sources. It can still be wrong, so open the sources.</footer>
+<footer>VERIFAI · Evidence-grounded research. Always open the sources and use your judgment.</footer>
 
-<!-- Raw JSON drawer -->
-<div id="drawerBackdrop" class="hidden fixed inset-0 z-40 bg-black/50"></div>
-<aside id="drawer" class="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[34rem] translate-x-full bg-[#0a1020] border-l border-slate-800/80 flex flex-col" aria-hidden="true">
-  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
+<div id="drawerBackdrop" class="hidden fixed inset-0 z-40"></div>
+<aside id="drawer" class="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[34rem] translate-x-full border-l flex flex-col" aria-hidden="true">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-white/15">
     <div>
-      <div class="text-sm font-medium text-slate-100">Raw response</div>
-      <div class="text-[11px] text-slate-500 font-mono">ResearchResult · POST /api/research</div>
+      <div class="text-sm font-medium text-white">Raw response</div>
+      <div class="text-[11px] text-white/55 font-mono">ResearchResult · POST /api/research</div>
     </div>
     <div class="flex items-center gap-2">
-      <button id="copyJsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 hover:border-sky-500/60 text-slate-300 cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy</span></button>
-      <button id="closeDrawer" type="button" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <button id="copyJsonBtn" type="button" class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/20 hover:border-white/50 text-white/80 cursor-pointer"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy</span></button>
+      <button id="closeDrawer" type="button" class="p-1.5 rounded-lg hover:bg-white/10 text-white/75 cursor-pointer" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
   </div>
-  <pre id="jsonPre" class="flex-1 overflow-auto p-4 text-[12px] leading-relaxed font-mono text-slate-300"></pre>
+  <pre id="jsonPre" class="flex-1 overflow-auto p-4 text-[12px] leading-relaxed font-mono"></pre>
 </aside>
 
 <script>
   /* ---------- helpers ---------- */
   const $ = id => document.getElementById(id);
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const gsapAvailable = Boolean(window.gsap && window.ScrollTrigger);
+  const useGsapMotion = gsapAvailable && !reducedMotion.matches;
+
+  /* ---------- cursor glow + scroll-linked hero motion ---------- */
+  const blueWorld = document.querySelector('.blue-world');
+  const heroCopy = document.querySelector('.hero-copy');
+  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+  if (blueWorld && heroCopy && !reducedMotion.matches) {
+    let pointerFrame = 0, pointerIdleTimer = 0;
+    let targetGlowX = window.innerWidth / 2, targetGlowY = window.innerHeight / 2;
+    let currentGlowX = targetGlowX, currentGlowY = targetGlowY;
+    const animatePointer = () => {
+      currentGlowX += (targetGlowX - currentGlowX) * .12;
+      currentGlowY += (targetGlowY - currentGlowY) * .12;
+      blueWorld.style.setProperty('--cursor-glow-x', `${currentGlowX.toFixed(2)}px`);
+      blueWorld.style.setProperty('--cursor-glow-y', `${currentGlowY.toFixed(2)}px`);
+      if (Math.abs(targetGlowX - currentGlowX) > .05 || Math.abs(targetGlowY - currentGlowY) > .05) {
+        pointerFrame = requestAnimationFrame(animatePointer);
+      } else {
+        pointerFrame = 0;
+      }
+    };
+    const movePointer = event => {
+      targetGlowX = event.clientX;
+      targetGlowY = event.clientY;
+      clearTimeout(pointerIdleTimer);
+      pointerIdleTimer = setTimeout(resetPointer, 500);
+      if (!pointerFrame) pointerFrame = requestAnimationFrame(animatePointer);
+    };
+    const resetPointer = () => {
+      targetGlowX = window.innerWidth / 2;
+      targetGlowY = window.innerHeight / 2;
+      if (!pointerFrame) pointerFrame = requestAnimationFrame(animatePointer);
+    };
+    if (finePointer.matches) {
+      window.addEventListener('pointermove', movePointer, { passive: true });
+      window.addEventListener('pointerleave', resetPointer, { passive: true });
+    }
+
+    const updateScrollState = () => {
+      document.body.classList.toggle('scrolled', window.scrollY > 24);
+    };
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    updateScrollState();
+  }
+  if (reducedMotion.matches) {
+    const updateScrollState = () => document.body.classList.toggle('scrolled', window.scrollY > 24);
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    updateScrollState();
+  }
+
+  /* ---------- autonomous ocean motion + scroll reveals ---------- */
+  let motionContext = null;
+  function setupGsapMotion() {
+    if (!useGsapMotion) return;
+    gsap.registerPlugin(ScrollTrigger);
+    motionContext = gsap.context(() => {
+      document.body.classList.add('gsap-ready');
+      gsap.timeline({ repeat: -1, yoyo: true, defaults: { ease: 'sine.inOut' } })
+        .to('.wave-art', { duration: 24, xPercent: 2.4, yPercent: -1.5, scale: 1.035, rotation: .25 })
+        .to('.wave-art', { duration: 28, xPercent: -2.2, yPercent: 1.7, scale: 1.055, rotation: -.2 });
+      gsap.to('.wave-form', {
+        duration: 19, xPercent: 2.5, yPercent: -1.8, scale: 1.035, rotation: .35,
+        ease: 'sine.inOut', repeat: -1, yoyo: true
+      });
+      gsap.to('.wave-shadow', {
+        duration: 27, xPercent: -2.1, yPercent: 1.4, scale: 1.05, rotation: -.25,
+        ease: 'sine.inOut', repeat: -1, yoyo: true, delay: -8
+      });
+      gsap.to('.blue-world', {
+        duration: 31, '--ocean-depth': 1, ease: 'sine.inOut', repeat: -1, yoyo: true
+      });
+
+      gsap.to(heroCopy, {
+        '--hero-scroll-shift': '-72px',
+        '--hero-scroll-opacity': '.35',
+        ease: 'none',
+        scrollTrigger: { trigger: '#heroSection', start: 'top top', end: 'bottom top', scrub: 1 }
+      });
+      gsap.utils.toArray('.journey-stage').forEach((stage, index, stages) => {
+        ScrollTrigger.create({
+          trigger: stage,
+          start: 'top 68%',
+          end: 'bottom 38%',
+          onEnter: () => stages.forEach((item, itemIndex) => item.classList.toggle('is-active', itemIndex === index)),
+          onEnterBack: () => stages.forEach((item, itemIndex) => item.classList.toggle('is-active', itemIndex === index))
+        });
+        gsap.fromTo(stage, { y: 22, opacity: .35 }, {
+          y: 0, opacity: 1, duration: .8, ease: 'power3.out',
+          scrollTrigger: { trigger: stage, start: 'top 88%', once: true }
+        });
+      });
+      gsap.utils.toArray('.gsap-reveal').forEach((element, index) => {
+        gsap.fromTo(element, { y: 28, opacity: 0 }, {
+          y: 0, opacity: 1, duration: .8, delay: (index % 3) * .08, ease: 'power3.out',
+          scrollTrigger: { trigger: element, start: 'top 88%', once: true }
+        });
+      });
+    }, document);
+  }
+  setupGsapMotion();
+  window.addEventListener('pagehide', () => {
+    if (motionContext) motionContext.revert();
+  }, { once: true });
+
+  // Hero interactions: keep the first screen close to the visual reference, with search on demand.
+  $('openSearch').addEventListener('click', () => {
+    $('heroSection').classList.add('search-open');
+    $('heroInput').focus({ preventScroll: true });
+  });
+  $('closeSearch').addEventListener('click', () => {
+    $('heroSection').classList.remove('search-open');
+    $('heroInput').value = '';
+  });
+
   function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
@@ -238,13 +710,30 @@
       <i data-lucide="${p.icon}" class="w-4 h-4 shrink-0 opacity-80"></i>
       <span class="min-w-0"><span class="block text-sm font-medium truncate">${p.label}</span><span class="block text-[11px] text-slate-500">${p.hint}</span></span>
     </button>`).join('');
+  const revealItems = [...document.querySelectorAll('#presets button')];
+  revealItems.forEach((item, index) => {
+    item.classList.add('reveal-item');
+    item.style.setProperty('--reveal-delay', `${index * 70}ms`);
+  });
+  if ('IntersectionObserver' in window && !reducedMotion.matches) {
+    const revealObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        revealObserver.unobserve(entry.target);
+      });
+    }, { threshold: .16, rootMargin: '0px 0px -8% 0px' });
+    revealItems.forEach(item => revealObserver.observe(item));
+  } else {
+    revealItems.forEach(item => item.classList.add('is-visible'));
+  }
   $('presets').addEventListener('click', e => {
     const b = e.target.closest('[data-preset]'); if (!b) return;
     runResearch(PRESETS[+b.dataset.preset].q);
   });
 
   /* ---------- state ---------- */
-  let lastData = null, lastSources = [], timerId = null, stageTimeouts = [], healthMode = null, isLoading = false;
+  let lastData = null, lastSources = [], timerId = null, stageTimeouts = [], healthMode = null, isLoading = false, claimsHaveEntered = false;
   const STAGES = [
     { t: 0,     label: 'Planning search queries…' },
     { t: 3500,  label: 'Querying Tavily web index…' },
@@ -300,7 +789,7 @@
     if (!question) { showNotice('Enter a research question to get started.'); return; }
     if (question.length < 5) { showNotice('Questions need at least 5 characters. Add a little more detail.'); return; }
     clearNotice();
-    $('heroInput').value = question; $('compactInput').value = question;
+    $('heroInput').value = question; $('compactInput').value = question; $('heroSection').classList.remove('search-open');
 
     setBusy(true);
     $('errorBox').classList.add('hidden');
@@ -466,7 +955,7 @@
   ];
   const claimKey = c => ['supported', 'partially_supported', 'contradicted'].includes(c.verification_status) ? c.verification_status : 'unverified';
 
-  const claimCard = (c, sources, idx) => {
+  const claimCard = (c, sources, idx, animate = true) => {
           const [vcls, vicon] = verStyles[c.verification_status] || verStyles.unverified;
           const ev = c.evidence || [];
           const evHtml = ev.map(e => {
@@ -480,7 +969,7 @@
               <p class="text-[13.5px] text-slate-200 leading-relaxed">“${escapeHtml(e.excerpt)}”</p>
             </div>`;
           }).join('');
-          return `<div class="glass rounded-xl p-5 fade-in">
+          return `<div class="glass rounded-xl p-5 ${animate ? 'fade-in' : ''}">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-3.5">
               <span class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${vcls}"><i data-lucide="${vicon}" class="w-3.5 h-3.5"></i>${escapeHtml(pretty(c.verification_status))}</span>
               ${confBadge(c.confidence)}
@@ -510,18 +999,33 @@
     }).join('');
 
     const shown = claimFilter === 'all' ? claims : claims.filter(c => claimKey(c) === claimFilter);
+    const animateCards = !claimsHaveEntered;
     $('claimsList').innerHTML = claims.length === 0
       ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">${lastData && lastData.status === 'insufficient_evidence' ? 'No claims were verified because the evidence was insufficient.' : 'No claims were extracted for this answer.'}</div>`
       : shown.length === 0
         ? `<div class="p-4 rounded-xl glass text-sm text-slate-400">No claims match this filter.</div>`
-        : shown.map(c => claimCard(c, sources, idx)).join('');
+        : shown.map(c => claimCard(c, sources, idx, animateCards)).join('');
+    claimsHaveEntered = true;
     linkCitations($('claimsList'), sources);
+  }
+
+  function animateReportEntrance() {
+    if (!useGsapMotion) return;
+    const panels = [$('statusBanner'), $('answerCard'), $('limitationsBox'), $('claimsList'), $('sourcesList')]
+      .filter(el => el && !el.classList.contains('hidden'));
+    gsap.fromTo(panels, { y: 18, opacity: 0 }, {
+      y: 0, opacity: 1, duration: .7, stagger: .08, ease: 'power3.out', clearProps: 'transform'
+    });
+    gsap.fromTo([...$('sourcesList').children], { y: 14, opacity: 0 }, {
+      y: 0, opacity: 1, duration: .55, stagger: .06, delay: .22, ease: 'power2.out', clearProps: 'transform'
+    });
   }
 
   function renderReport(data) {
     lastData = data;
     const sources = data.sources || [];
     lastSources = sources;
+    claimsHaveEntered = false;
     const idx = {}; sources.forEach((s, i) => { idx[s.id] = i + 1; });
 
     // status pill + meta
@@ -593,10 +1097,14 @@
           </a>
         </div>`;
         }).join('');
+    [...$('sourcesList').children].forEach((card, index) => {
+      card.style.animationDelay = `${Math.min(index * 70, 280)}ms`;
+    });
 
     $('resultsContainer').classList.remove('hidden');
     $('jsonPre').textContent = JSON.stringify(data, null, 2);
     icons();
+    animateReportEntrance();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
