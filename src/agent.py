@@ -8,6 +8,7 @@ import sys
 import json
 import re
 import uuid
+from datetime import date
 from dataclasses import dataclass
 from typing import List, Dict, Any, Literal, Tuple
 from urllib.parse import urlparse
@@ -77,6 +78,306 @@ def normalize_url(url: str) -> str:
     return f"{parsed.netloc}{parsed.path}".lower()
 
 
+def _normalize_doi_value(value: str) -> str:
+    normalized = value.strip()
+
+    def balanced(text: str) -> bool:
+        pairs = (("(", ")"), ("[", "]"), ("{", "}"))
+        for opening, closing in pairs:
+            depth = 0
+            for character in text:
+                if character == opening:
+                    depth += 1
+                elif character == closing:
+                    depth -= 1
+                    if depth < 0:
+                        return False
+            if depth:
+                return False
+        return True
+
+    def remove_unmatched_closing(text: str) -> str:
+        for opening, closing in (("(", ")"), ("[", "]"), ("{", "}")):
+            while text.endswith(closing) and text.count(closing) > text.count(opening):
+                text = text[:-1].rstrip()
+        return text
+
+    def remove_surrounding_wrappers(text: str) -> str:
+        changed = True
+        while changed and len(text) >= 2:
+            changed = False
+            for opening, closing in (("(", ")"), ("[", "]"), ("{", "}")):
+                if (
+                    text.startswith(opening)
+                    and text.endswith(closing)
+                    and balanced(text[1:-1])
+                ):
+                    text = text[1:-1].strip()
+                    changed = True
+                    break
+        return text
+
+    normalized = normalized.rstrip(".,;:")
+    normalized = remove_unmatched_closing(normalized)
+    normalized = remove_surrounding_wrappers(normalized)
+    normalized = re.sub(
+        r"^https?://doi\.org/",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(r"^doi:\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = normalized.rstrip(".,;:")
+    normalized = remove_unmatched_closing(normalized)
+    normalized = remove_surrounding_wrappers(normalized)
+    return normalized.lower()
+
+
+def _normalized_identifier(
+    identifier_type: str,
+    value: Any,
+    basis: str,
+    matched_text: str,
+) -> Dict[str, str] | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if identifier_type == "doi":
+        normalized = _normalize_doi_value(normalized)
+    else:
+        normalized = normalized.strip(".,;:)]}").lower()
+    normalized = normalized.lower()
+    if not normalized:
+        return None
+    return {
+        "type": identifier_type,
+        "value": normalized,
+        "basis": basis,
+        "matched_text": matched_text,
+    }
+
+
+def _normalize_explicit_date(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    try:
+        return date.fromisoformat(candidate).isoformat()
+    except ValueError:
+        pass
+    match = re.fullmatch(
+        r"(January|February|March|April|May|June|July|August|September|"
+        r"October|November|December)\s+([0-9]{1,2}),?\s+((?:19|20)[0-9]{2})",
+        candidate,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    month = {
+        "january": 1, "february": 2, "march": 3, "april": 4,
+        "may": 5, "june": 6, "july": 7, "august": 8,
+        "september": 9, "october": 10, "november": 11, "december": 12,
+    }[match.group(1).lower()]
+    try:
+        return date(int(match.group(3)), month, int(match.group(2))).isoformat()
+    except ValueError:
+        return None
+
+
+def _extract_publication_metadata(source: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract only explicit publication metadata from a retrieved source."""
+    content = source.get("raw_content") or source.get("content") or ""
+    content = content if isinstance(content, str) else ""
+    retrieved_metadata = source.get("retrieved_metadata", {})
+    if not isinstance(retrieved_metadata, dict):
+        retrieved_metadata = {}
+    identifiers: List[Dict[str, str]] = []
+    seen_identifiers = set()
+
+    def add_identifier(
+        identifier_type: str,
+        value: Any,
+        basis: str,
+        matched_text: str,
+    ) -> None:
+        identifier = _normalized_identifier(
+            identifier_type, value, basis, matched_text
+        )
+        if identifier is None:
+            return
+        identity = (identifier["type"], identifier["value"])
+        if identity not in seen_identifiers:
+            seen_identifiers.add(identity)
+            identifiers.append(identifier)
+
+    for field, identifier_type in (
+        ("doi", "doi"),
+        ("publication_id", "publication_id"),
+        ("report_id", "report_identifier"),
+        ("bulletin_id", "bulletin_identifier"),
+        ("provenance_id", "provenance_id"),
+        ("originating_publication", "originating_publication"),
+    ):
+        value = source.get(field, retrieved_metadata.get(field))
+        if value is not None:
+            add_identifier(
+                identifier_type,
+                value,
+                "tavily_metadata",
+                str(value),
+            )
+
+    doi_pattern = re.compile(
+        r"\b10\.\d{4,9}/[-._;()/:A-Z0-9+%]+",
+        re.IGNORECASE,
+    )
+    for match in doi_pattern.finditer(content):
+        add_identifier("doi", match.group(0), "content", match.group(0))
+
+    report_patterns = (
+        (
+            "report_identifier",
+            re.compile(
+                r"\b(report)\s+(?:no\.?|number|#|identifier)\s*[:#-]?\s*"
+                r"([A-Z0-9][A-Z0-9./_-]{1,})",
+                re.IGNORECASE,
+            ),
+        ),
+        (
+            "bulletin_identifier",
+            re.compile(
+                r"\b(bulletin)\s+(?:no\.?|number|#|identifier)\s*[:#-]?\s*"
+                r"([A-Z0-9][A-Z0-9./_-]{1,})",
+                re.IGNORECASE,
+            ),
+        ),
+    )
+    for identifier_type, pattern in report_patterns:
+        for match in pattern.finditer(content):
+            add_identifier(
+                identifier_type,
+                match.group(2),
+                "content",
+                match.group(0),
+            )
+
+    publication_dates: List[Dict[str, str]] = []
+    seen_dates = set()
+    date_patterns = (
+        re.compile(
+            r"\b(?:published|publication date|released|issued)\s*(?:on|:|-)\s*"
+            r"((?:19|20)\d{2}-\d{2}-\d{2})\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:published|publication date|released|issued)\s*(?:on|:|-)\s*"
+            r"((?:January|February|March|April|May|June|July|August|September|"
+            r"October|November|December)\s+\d{1,2},?\s+(?:19|20)\d{2})\b",
+            re.IGNORECASE,
+        ),
+    )
+    for pattern in date_patterns:
+        for match in pattern.finditer(content):
+            normalized = _normalize_explicit_date(match.group(1))
+            if normalized and normalized not in seen_dates:
+                seen_dates.add(normalized)
+                publication_dates.append({
+                    "value": normalized,
+                    "basis": "content",
+                    "matched_text": match.group(0),
+                })
+
+    metadata: Dict[str, Any] = {
+        "identifiers": identifiers,
+        "publication_dates": publication_dates,
+        "publication_relationship": "unknown",
+        "evidence_independence": "unknown",
+    }
+    for field in ("canonical_url", "canonical", "canonicalUrl"):
+        candidate = source.get(field)
+        if isinstance(candidate, str):
+            parsed = urlparse(candidate.strip())
+            if parsed.scheme in ("http", "https") and parsed.netloc:
+                metadata["canonical_url"] = candidate.strip()
+                break
+    for field in ("published_date", "publication_date"):
+        normalized = _normalize_explicit_date(source.get(field))
+        if normalized:
+            metadata["published_date"] = normalized
+            break
+    return metadata
+
+
+def enrich_source_provenance(source: Dict[str, Any]) -> Dict[str, Any]:
+    """Preserve valid optional retrieval metadata and add internal provenance data."""
+    enriched = dict(source)
+    for field in ("published_date", "publication_date", "raw_content", "canonical_url"):
+        value = source.get(field)
+        if isinstance(value, str) and value.strip():
+            if field == "canonical_url":
+                parsed = urlparse(value.strip())
+                if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                    continue
+            elif field in ("published_date", "publication_date"):
+                if _normalize_explicit_date(value) is None:
+                    continue
+            enriched[field] = value.strip()
+    retrieved_metadata = source.get("retrieved_metadata")
+    if isinstance(retrieved_metadata, dict):
+        enriched["retrieved_metadata"] = dict(retrieved_metadata)
+    enriched["publication_metadata"] = _extract_publication_metadata(enriched)
+    return enriched
+
+
+def assign_publication_relationships(
+    sources: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Record explicit publication relationships without inferring independence."""
+    assigned = [dict(source) for source in sources]
+    for source in assigned:
+        metadata = source.setdefault("publication_metadata", {})
+        metadata.setdefault("publication_relationship", "unknown")
+        metadata["relationships"] = {}
+
+    def relationship_identity(identifier: Dict[str, str]) -> Tuple[str, str]:
+        identifier_type = identifier["type"]
+        if identifier_type in {
+            "provenance_id",
+            "publication_id",
+            "originating_publication",
+        }:
+            identifier_type = "publication_identity"
+        return identifier_type, identifier["value"]
+
+    identifier_sets = []
+    for source in assigned:
+        identifiers = source["publication_metadata"].get("identifiers", [])
+        identifier_sets.append({
+            relationship_identity(item)
+            for item in identifiers
+            if item.get("type") and item.get("value")
+        })
+
+    for index, source in enumerate(assigned):
+        relationships = source["publication_metadata"]["relationships"]
+        for other_index, other in enumerate(assigned):
+            if index == other_index:
+                continue
+            shared = identifier_sets[index] & identifier_sets[other_index]
+            if shared:
+                relationship = "same_publication"
+            elif any(
+                left_type == right_type
+                for left_type, _ in identifier_sets[index]
+                for right_type, _ in identifier_sets[other_index]
+            ):
+                relationship = "distinct_publications"
+            else:
+                relationship = "unknown"
+            relationships[other["id"]] = relationship
+    return assigned
+
+
 def retrieve_and_dedupe_with_metadata(
     queries: List[str],
     max_results_per_query: int = 4,
@@ -142,6 +443,28 @@ def retrieve_and_dedupe_with_metadata(
                         "content": content[:1500],  # Cap snippet length for context efficiency
                         "score": round(score, 2),
                         "matched_query": q,
+                        **{
+                            field: item[field]
+                            for field in (
+                                "published_date",
+                                "publication_date",
+                                "raw_content",
+                                "canonical_url",
+                            )
+                            if isinstance(item.get(field), str) and item[field].strip()
+                        },
+                        "retrieved_metadata": {
+                            field: item[field]
+                            for field in (
+                                "doi",
+                                "publication_id",
+                                "report_id",
+                                "bulletin_id",
+                                "provenance_id",
+                                "originating_publication",
+                            )
+                            if isinstance(item.get(field), str) and item[field].strip()
+                        },
                     })
             if malformed_items:
                 limitations.append(
@@ -182,10 +505,10 @@ def assign_source_ids(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Add stable, locally generated IDs to retrieved sources."""
     assigned = []
     for index, source in enumerate(sources, start=1):
-        item = dict(source)
+        item = enrich_source_provenance(source)
         item["id"] = f"S{index}"
         assigned.append(item)
-    return assigned
+    return assign_publication_relationships(assigned)
 
 
 def assign_source_roles(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
