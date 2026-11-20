@@ -2451,6 +2451,447 @@ class AgentEvidenceTests(unittest.TestCase):
         self.assertEqual(diagnostics.successful_search_calls, 1)
         self.assertTrue(any("malformed" in item.lower() or "ignored" in item.lower() for item in diagnostics.limitations))
 
+    @patch("src.agent.search_client.search")
+    def test_tavily_optional_metadata_is_preserved_and_extracted(self, mock_search):
+        mock_search.return_value = {
+            "results": [{
+                "title": "Research report",
+                "url": "https://example.gov/report",
+                "content": "Short snippet.",
+                "raw_content": (
+                    "Published: 2024-06-10. DOI: 10.1234/ABC.567. "
+                    "Report No. R-2024-07."
+                ),
+                "published_date": "2024-06-10",
+                "canonical_url": "https://example.gov/report",
+                "doi": "10.1234/ABC.567",
+                "report_id": "R-2024-07",
+                "score": 0.9,
+            }]
+        }
+
+        diagnostics = agent.retrieve_and_dedupe_with_metadata(["q"])
+        source = agent.assign_source_ids(diagnostics.sources)[0]
+        identifiers = source["publication_metadata"]["identifiers"]
+
+        self.assertEqual(source["published_date"], "2024-06-10")
+        self.assertEqual(source["raw_content"].startswith("Published:"), True)
+        self.assertEqual(source["canonical_url"], "https://example.gov/report")
+        self.assertEqual(
+            {(item["type"], item["value"]) for item in identifiers},
+            {
+                ("doi", "10.1234/abc.567"),
+                ("report_identifier", "r-2024-07"),
+            },
+        )
+        self.assertTrue(all(item["basis"] == "tavily_metadata" for item in identifiers[:2]))
+        self.assertEqual(source["publication_metadata"]["published_date"], "2024-06-10")
+
+    @patch("src.agent.search_client.search")
+    def test_tavily_generic_identifiers_survive_retrieval_and_compare(self, mock_search):
+        mock_search.return_value = {
+            "results": [
+                {
+                    "title": "Primary report",
+                    "url": "https://example.gov/report",
+                    "content": "A source with explicit provenance.",
+                    "provenance_id": "publication-123",
+                    "score": 0.9,
+                },
+                {
+                    "title": "Report mirror",
+                    "url": "https://archive.example/report",
+                    "content": "A source with an originating publication.",
+                    "originating_publication": "publication-123",
+                    "score": 0.8,
+                },
+            ]
+        }
+
+        diagnostics = agent.retrieve_and_dedupe_with_metadata(["q"])
+        sources = agent.assign_source_ids(diagnostics.sources)
+
+        self.assertEqual(
+            sources[0]["retrieved_metadata"]["provenance_id"],
+            "publication-123",
+        )
+        self.assertEqual(
+            sources[1]["retrieved_metadata"]["originating_publication"],
+            "publication-123",
+        )
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["relationships"]["S1"],
+            "same_publication",
+        )
+        self.assertEqual(
+            {
+                (item["type"], item["value"])
+                for item in sources[0]["publication_metadata"]["identifiers"]
+            },
+            {("provenance_id", "publication-123")},
+        )
+
+    @patch("src.agent.search_client.search")
+    def test_tavily_without_optional_metadata_remains_unknown(self, mock_search):
+        mock_search.return_value = {
+            "results": [{
+                "title": "Basic result",
+                "url": "https://example.org/article",
+                "content": "A source without publication metadata.",
+                "score": 0.8,
+            }]
+        }
+
+        diagnostics = agent.retrieve_and_dedupe_with_metadata(["q"])
+        source = agent.assign_source_ids(diagnostics.sources)[0]
+
+        self.assertNotIn("published_date", source)
+        self.assertNotIn("raw_content", source)
+        self.assertNotIn("canonical_url", source)
+        self.assertEqual(source["publication_metadata"]["identifiers"], [])
+        self.assertEqual(source["publication_metadata"]["publication_dates"], [])
+        self.assertEqual(source["publication_metadata"]["publication_relationship"], "unknown")
+        self.assertEqual(source["publication_metadata"]["evidence_independence"], "unknown")
+
+    def test_doi_extraction_normalizes_and_matches_duplicates(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "content": "The DOI is https://doi.org/10.5555/ABC.123.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report mirror",
+                "url": "https://mirror.example/b",
+                "retrieved_metadata": {"doi": "doi:10.5555/abc.123"},
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-3",
+                "title": "Report citation",
+                "url": "https://citation.example/c",
+                "content": "DOI: 10.5555/abc.123",
+            },
+        ])
+
+        first = sources[0]["publication_metadata"]["identifiers"]
+        second = sources[1]["publication_metadata"]["identifiers"]
+        third = sources[2]["publication_metadata"]["identifiers"]
+        self.assertEqual(first[0]["value"], "10.5555/abc.123")
+        self.assertEqual(second[0]["value"], "10.5555/abc.123")
+        self.assertEqual(third[0]["value"], "10.5555/abc.123")
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["relationships"]["S1"],
+            "same_publication",
+        )
+        self.assertEqual(
+            sources[2]["publication_metadata"]["relationships"]["S1"],
+            "same_publication",
+        )
+
+    def test_doi_plus_and_percent_suffix_matches_metadata_and_content(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Metadata DOI",
+                "url": "https://example.org/a",
+                "retrieved_metadata": {
+                    "doi": "doi:10.5555/example+a%20b",
+                },
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Content DOI",
+                "url": "https://example.org/b",
+                "content": "DOI: https://doi.org/10.5555/example+a%20b.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example+a%20b",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example+a%20b",
+        )
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+
+    def test_doi_and_report_identifier_are_not_comparable(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "DOI source",
+                "url": "https://example.org/a",
+                "content": "DOI: 10.5555/abc.123",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report source",
+                "url": "https://example.org/b",
+                "content": "Report No. R-2024-07.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "unknown",
+        )
+
+    def test_different_doi_values_are_distinct_publications(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "DOI source A",
+                "url": "https://example.org/a",
+                "content": "DOI: 10.5555/abc.123",
+            },
+            {
+                "id": "ignored-2",
+                "title": "DOI source B",
+                "url": "https://example.org/b",
+                "content": "DOI: 10.5555/abc.124",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "distinct_publications",
+        )
+
+    def test_different_report_identifiers_are_distinct_publications(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report source A",
+                "url": "https://example.org/a",
+                "content": "Report No. R-2024-07.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report source B",
+                "url": "https://example.org/b",
+                "content": "Report No. R-2024-08.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "distinct_publications",
+        )
+
+    def test_matching_identifier_takes_precedence_over_other_difference(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report source A",
+                "url": "https://example.org/a",
+                "content": "DOI: 10.5555/abc.123. Report No. R-2024-07.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report source B",
+                "url": "https://example.org/b",
+                "content": "DOI: 10.5555/abc.123. Report No. R-2024-08.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+
+    def test_doi_preserves_balanced_parenthesized_suffix(self):
+        source = agent.assign_source_ids([{
+            "id": "ignored",
+            "title": "Parenthesized DOI",
+            "url": "https://example.org/a",
+            "content": "DOI: 10.5555/example(2024).",
+        }])[0]
+
+        self.assertEqual(
+            source["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example(2024)",
+        )
+
+    def test_doi_removes_citation_period_and_surrounding_parentheses(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Punctuated DOI",
+                "url": "https://example.org/a",
+                "content": "DOI: 10.5555/example.abc.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Wrapped DOI",
+                "url": "https://example.org/b",
+                "content": "(https://doi.org/10.5555/example.abc)",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example.abc",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example.abc",
+        )
+
+    def test_equivalent_metadata_and_content_dois_match_after_punctuation_normalization(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Metadata DOI",
+                "url": "https://example.org/a",
+                "retrieved_metadata": {"doi": "(doi:10.5555/example(2024))."},
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Content DOI",
+                "url": "https://example.org/b",
+                "content": "DOI: https://doi.org/10.5555/example(2024).",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example(2024)",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["identifiers"][0]["value"],
+            "10.5555/example(2024)",
+        )
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+
+    def test_generic_publication_identifiers_match_across_metadata_fields(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "provenance_id": "publication-123",
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report mirror",
+                "url": "https://mirror.example/b",
+                "originating_publication": "publication-123",
+                "content": "A measurement report.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "same_publication",
+        )
+
+    def test_report_identifier_extraction_requires_explicit_label(self):
+        source = agent.assign_source_ids([{
+            "id": "ignored",
+            "title": "Bulletin",
+            "url": "https://example.int/bulletin",
+            "content": "The World Meteorological Organization Bulletin No. 21.",
+        }])[0]
+
+        self.assertEqual(
+            source["publication_metadata"]["identifiers"],
+            [{
+                "type": "bulletin_identifier",
+                "value": "21",
+                "basis": "content",
+                "matched_text": "Bulletin No. 21.",
+            }],
+        )
+
+    def test_ambiguous_dates_and_identifiers_remain_unknown(self):
+        source = agent.assign_source_ids([{
+            "id": "ignored",
+            "title": "General article",
+            "url": "https://example.org/article",
+            "content": "The report discussed results in 2024; date 06/10/2024.",
+        }])[0]
+
+        metadata = source["publication_metadata"]
+        self.assertEqual(metadata["identifiers"], [])
+        self.assertEqual(metadata["publication_dates"], [])
+
+    def test_different_urls_without_identifiers_have_unknown_relationship(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report B",
+                "url": "https://mirror.example/b",
+                "content": "A measurement report.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "unknown",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["relationships"]["S1"],
+            "unknown",
+        )
+
+    def test_distinct_publication_identifiers_do_not_establish_independence(self):
+        sources = agent.assign_source_ids([
+            {
+                "id": "ignored-1",
+                "title": "Report A",
+                "url": "https://example.org/a",
+                "doi": "10.5555/one",
+                "content": "A measurement report.",
+            },
+            {
+                "id": "ignored-2",
+                "title": "Report B",
+                "url": "https://example.org/b",
+                "doi": "10.5555/two",
+                "content": "A measurement report.",
+            },
+        ])
+
+        self.assertEqual(
+            sources[0]["publication_metadata"]["relationships"]["S2"],
+            "distinct_publications",
+        )
+        self.assertEqual(
+            sources[0]["publication_metadata"]["evidence_independence"],
+            "unknown",
+        )
+        self.assertEqual(
+            sources[1]["publication_metadata"]["evidence_independence"],
+            "unknown",
+        )
+
     def test_partial_retrieval_with_valid_evidence_can_produce_answer(self):
         sources = [
             {
